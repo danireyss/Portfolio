@@ -1,4 +1,4 @@
-.PHONY: dev dev-otel backend frontend test build build-frontend build-backend synth deploy deploy-github-role upload-photos
+.PHONY: dev dev-otel backend frontend test bench flamegraph build build-frontend build-backend synth deploy deploy-github-role upload-photos
 
 # Run the Axum API (:3000) and the Vite dev server (:5173) together.
 dev:
@@ -30,6 +30,15 @@ test:
 	cd backend && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 	cd frontend && npm run lint && npm run typecheck && npm test
 	cd infra && npx tsc --noEmit && npm test
+
+# Request latency with hyperfine (local release build + the live site); see scripts/bench.sh.
+# `make bench MODE=local` or `MODE=prod` runs just one half.
+bench:
+	scripts/bench.sh $(MODE)
+
+# CPU flamegraphs (no sudo) of a cold start and the warm request path; see backend/examples/profile.rs.
+flamegraph:
+	cd backend && cargo run --profile profiling --example profile -- ../bench/results/flamegraph-$$(date +%Y%m%d-%H%M%S)
 
 build: build-frontend build-backend
 

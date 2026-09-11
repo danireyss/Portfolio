@@ -40,7 +40,10 @@ export class Api extends Construct {
       architecture: lambda.Architecture.ARM_64,
       handler: 'bootstrap',
       code: lambda.Code.fromAsset(props.codePath),
-      memorySize: 256,
+      // Lambda allots CPU in proportion to memory. The API needs under 40 MB, but cold starts and
+      // the first TLS handshake to S3/SES are CPU-bound: at 256 MB that first S3 call took ~450 ms.
+      // Invocations take a few milliseconds, so the extra memory costs next to nothing.
+      memorySize: 1024,
       timeout: Duration.seconds(10),
       environment: {
         CONTACT_TO_EMAIL: props.contactEmail,

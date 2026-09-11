@@ -10,3 +10,6 @@ infra/cdk.out/
 # Gallery photos live in the S3 media bucket, not git. This local copy is served by `make dev`
 # and uploaded with `make upload-photos`.
 frontend/public/photos/
+
+# Benchmark output from scripts/bench.sh.
+bench/results/

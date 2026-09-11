@@ -38,13 +38,14 @@ test('runs the viewer-request function on the site', () => {
   })
 })
 
-test('uploads hashed assets as immutable and the rest as revalidated', () => {
+test('uploads hashed assets as immutable, and the rest revalidated by browsers but kept at the edge', () => {
   template.hasResourceProperties('Custom::CDKBucketDeployment', {
     DestinationBucketKeyPrefix: 'assets/',
     SystemMetadata: { 'cache-control': 'public, max-age=31536000, immutable' },
   })
   template.hasResourceProperties('Custom::CDKBucketDeployment', {
-    SystemMetadata: { 'cache-control': 'public, max-age=0, must-revalidate' },
+    SystemMetadata: { 'cache-control': 'public, max-age=0, s-maxage=31536000, must-revalidate' },
+    // The deploy invalidation is what makes the long edge TTL safe.
     DistributionPaths: ['/*'],
   })
 })

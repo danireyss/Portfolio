@@ -2,8 +2,11 @@
 //! local folder (frontend/public/photos/, which Vite serves) in development. Only the listing
 //! goes through here; the images themselves are served by CloudFront or Vite.
 
+use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::path::PathBuf;
+use std::sync::{Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use aws_sdk_s3::error::DisplayErrorContext;
@@ -76,6 +79,49 @@ impl PhotoStore for S3PhotoStore {
     }
 }
 
+/// Remembers each folder's listing for `ttl`, so most requests on a warm Lambda instance skip the
+/// S3 round trip. Newly uploaded photos appear within `ttl` (plus CloudFront's API cache). Errors
+/// aren't cached.
+pub struct CachedPhotoStore<S> {
+    inner: S,
+    ttl: Duration,
+    listings: Mutex<HashMap<String, (Instant, Vec<String>)>>,
+}
+
+impl<S> CachedPhotoStore<S> {
+    pub fn new(inner: S, ttl: Duration) -> Self {
+        Self {
+            inner,
+            ttl,
+            listings: Mutex::default(),
+        }
+    }
+}
+
+#[async_trait]
+impl<S: PhotoStore> PhotoStore for CachedPhotoStore<S> {
+    async fn list(&self, folder: &str) -> Result<Vec<String>, PhotoStoreError> {
+        // The lock is released at the end of each statement, never held across an await.
+        let cached = self
+            .listings
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(folder)
+            .filter(|(fetched, _)| fetched.elapsed() < self.ttl)
+            .map(|(_, names)| names.clone());
+        if let Some(names) = cached {
+            return Ok(names);
+        }
+
+        let names = self.inner.list(folder).await?;
+        self.listings
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(folder.to_owned(), (Instant::now(), names.clone()));
+        Ok(names)
+    }
+}
+
 /// For local development: lists `<root>/<folder>/`.
 pub struct LocalPhotoStore {
     root: PathBuf,
@@ -127,6 +173,40 @@ mod tests {
         for name in [".DS_Store", "._01.jpg", "notes.txt", "jpg", "README"] {
             assert!(!is_image(name), "{name}");
         }
+    }
+
+    /// Counts how often it's asked to list.
+    struct CountingStore(std::sync::atomic::AtomicUsize);
+
+    #[async_trait]
+    impl PhotoStore for CountingStore {
+        async fn list(&self, _folder: &str) -> Result<Vec<String>, PhotoStoreError> {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(vec!["01.jpg".into()])
+        }
+    }
+
+    fn calls(store: &CachedPhotoStore<CountingStore>) -> usize {
+        store.inner.0.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    #[tokio::test]
+    async fn cached_store_reuses_listings_until_they_expire() {
+        let cached = CachedPhotoStore::new(CountingStore(0.into()), Duration::from_secs(60));
+        assert_eq!(cached.list("trip").await.unwrap(), ["01.jpg"]);
+        assert_eq!(cached.list("trip").await.unwrap(), ["01.jpg"]);
+        assert_eq!(
+            calls(&cached),
+            1,
+            "second listing should come from the cache"
+        );
+        cached.list("other").await.unwrap();
+        assert_eq!(calls(&cached), 2, "each folder is cached separately");
+
+        let expiring = CachedPhotoStore::new(CountingStore(0.into()), Duration::ZERO);
+        expiring.list("trip").await.unwrap();
+        expiring.list("trip").await.unwrap();
+        assert_eq!(calls(&expiring), 2, "expired listings are fetched again");
     }
 
     #[tokio::test]

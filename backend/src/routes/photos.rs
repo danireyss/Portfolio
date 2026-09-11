@@ -1,5 +1,6 @@
 use axum::Json;
 use axum::extract::State;
+use futures::future::try_join_all;
 use serde::Serialize;
 use ts_rs::TS;
 
@@ -17,11 +18,19 @@ pub struct PhotosResponse {
 pub(crate) async fn photos(
     State(state): State<AppState>,
 ) -> Result<Json<PhotosResponse>, AppError> {
-    let mut galleries = Vec::new();
-    for config in state.content.galleries() {
-        let files = state.photos.list(&config.folder).await?;
-        galleries.push(build_gallery(config, &files));
-    }
+    // List every gallery folder at once rather than one after another.
+    let configs = state.content.galleries();
+    let listings = try_join_all(
+        configs
+            .iter()
+            .map(|config| state.photos.list(&config.folder)),
+    )
+    .await?;
+    let galleries = configs
+        .iter()
+        .zip(&listings)
+        .map(|(config, files)| build_gallery(config, files))
+        .collect();
     Ok(Json(PhotosResponse { galleries }))
 }
 
