@@ -1,5 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
+import { Suspense } from 'react'
 import { useLocation, useOutlet } from 'react-router'
+import { PageSkeleton } from '@/components/QueryState'
 import { EASE_OUT } from '@/lib/motion'
 import { Footer } from './Footer'
 import { Nav } from './Nav'
@@ -28,7 +30,8 @@ export function Layout() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.25, ease: EASE_OUT }}
         >
-          {outlet}
+          {/* Lazy-loaded pages show the skeleton while their code downloads. */}
+          <Suspense fallback={<PageSkeleton />}>{outlet}</Suspense>
         </motion.main>
       </AnimatePresence>
       <Footer />

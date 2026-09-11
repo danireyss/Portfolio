@@ -1,6 +1,26 @@
+import type { UseQueryResult } from '@tanstack/react-query'
 import { RotateCw } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { isNotFound } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+
+type QueryStateProps<T> = {
+  query: UseQueryResult<T>
+  /** Rendered instead of the generic error when the API answers 404. */
+  notFound?: ReactNode
+  children: (data: T) => ReactNode
+}
+
+/** A page's loading skeleton, error with retry, or 404, then `children(data)` once it has loaded. */
+export function QueryState<T>({ query, notFound, children }: QueryStateProps<T>) {
+  if (query.isPending) return <PageSkeleton />
+  if (query.isError) {
+    if (notFound && isNotFound(query.error)) return notFound
+    return <ErrorState onRetry={() => query.refetch()} />
+  }
+  return children(query.data)
+}
 
 export function PageSkeleton() {
   return (
