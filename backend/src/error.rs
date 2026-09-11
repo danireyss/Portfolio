@@ -5,6 +5,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::email::MailError;
+use crate::photos::PhotoStoreError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
@@ -14,6 +15,8 @@ pub enum AppError {
     Validation(Vec<FieldError>),
     #[error("failed to send email: {0}")]
     Mail(#[from] MailError),
+    #[error("failed to list photos: {0}")]
+    Photos(#[from] PhotoStoreError),
 }
 
 /// JSON body of every API error response.
@@ -46,6 +49,14 @@ impl IntoResponse for AppError {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
                     "Your message couldn't be sent right now. Please email me directly instead.",
+                    Vec::new(),
+                )
+            }
+            AppError::Photos(err) => {
+                tracing::error!(error = %err, "listing photos failed");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Couldn't load photos right now.",
                     Vec::new(),
                 )
             }

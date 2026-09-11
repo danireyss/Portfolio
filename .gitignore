@@ -6,3 +6,7 @@ infra/cdk.out/
 .env.*
 *.local
 .DS_Store
+
+# Gallery photos live in the S3 media bucket, not git. This local copy is served by `make dev`
+# and uploaded with `make upload-photos`.
+frontend/public/photos/

@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use portfolio_api::content::Content;
 use portfolio_api::email::{LogMailer, Mailer, SesMailer};
+use portfolio_api::photos::{LocalPhotoStore, PhotoStore, S3PhotoStore};
 use portfolio_api::{AppState, app};
 use tracing_subscriber::EnvFilter;
 
@@ -24,7 +25,21 @@ async fn main() -> Result<(), Error> {
             Arc::new(LogMailer)
         }
     };
-    let app = app(AppState { content, mailer });
+    let photos: Arc<dyn PhotoStore> = match S3PhotoStore::from_env().await {
+        Some(s3) => Arc::new(s3),
+        None => {
+            // `make dev` runs from backend/, next to the frontend's (gitignored) photos folder.
+            let dir =
+                std::env::var("PHOTOS_DIR").unwrap_or_else(|_| "../frontend/public/photos".into());
+            tracing::info!(%dir, "MEDIA_BUCKET is not set; listing photos from a local folder");
+            Arc::new(LocalPhotoStore::new(dir))
+        }
+    };
+    let app = app(AppState {
+        content,
+        mailer,
+        photos,
+    });
 
     if on_lambda {
         return lambda_http::run(app).await;

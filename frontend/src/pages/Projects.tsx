@@ -5,6 +5,7 @@ import { PageMeta } from '@/components/PageMeta'
 import { ErrorState, PageSkeleton } from '@/components/PageState'
 import { ProjectCard } from '@/components/ProjectCard'
 import { TagFilter } from '@/components/TagFilter'
+import { EASE_OUT } from '@/lib/motion'
 
 export function Projects() {
   const { data, error, isPending, refetch } = useProjects()
@@ -39,15 +40,15 @@ export function Projects() {
         {visible.length} {visible.length === 1 ? 'project' : 'projects'} shown
       </p>
       <motion.ul layout className="mt-10 grid gap-5 sm:grid-cols-2">
-        <AnimatePresence mode="popLayout" initial={false}>
-          {visible.map((project) => (
+        {/* Cards stagger in on load, then fade in and out as the filter changes. */}
+        <AnimatePresence mode="popLayout">
+          {visible.map((project, index) => (
             <motion.li
               key={project.slug}
               layout
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: 0.25 }}
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0, transition: { duration: 0.4, ease: EASE_OUT, delay: index * 0.06 } }}
+              exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2 } }}
             >
               <ProjectCard project={project} />
             </motion.li>

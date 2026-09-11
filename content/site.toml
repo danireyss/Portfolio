@@ -1,69 +1,133 @@
 # Site content, served by the API (backend/src/content) and rendered by the frontend.
 # Unknown keys are rejected, so a typo fails `cargo test` instead of silently disappearing.
-# TODO(Daniel): replace every placeholder below with your real content.
+# Facts come from content/resume.pdf. Lines marked DRAFT are wording written from those facts;
+# rewrite them in your own voice.
 
 [profile]
 name = "Daniel Reyes"
 headline = "Software Engineer"
-location = "City, ST"
-tagline = "TODO: one or two sentences about what you build and what you care about."
-email = "you@example.com"
-# Put the image in frontend/public/ and reference it from the site root:
-# headshot = "/headshot.jpg"
+location = "Miami, FL"
+# DRAFT
+tagline = "Computer Science student at FIU who builds full-stack web apps and the AWS infrastructure they run on."
+email = "danieljreyes2001@gmail.com"
+# frontend/public/headshot.jpg: a square crop, since it's shown in a circle.
+headshot = "/headshot.jpg"
 
 [about]
+# DRAFT
 background = [
-  "TODO: a short paragraph about your education and background.",
-  "TODO: a second paragraph about what drives you as an engineer.",
+  "I'm a Computer Science student at Florida International University, graduating in December 2026 with a 3.77 GPA.",
+  "This summer I interned at an AI start-up, where I moved an internal build-and-release tool onto ECS Fargate, replaced long-lived AWS credentials with Okta OIDC and short-lived scoped tokens, and built a Grafana-based observability platform with the AWS CDK. Before that, I was part of a six-person team that built a warehouse management system for Global Empowerment Mission, a nonprofit.",
 ]
 
+# DRAFT
 [[about.focus_areas]]
-title = "TODO: Focus area"
-description = "TODO: what you do in this area."
+title = "Cloud infrastructure"
+description = "Scalable, secure AWS deployments defined as code: ECS Fargate, S3, ALB, and PrivateLink with the AWS CDK."
 
 [[about.focus_areas]]
-title = "TODO: Another focus area"
-description = "TODO: what you do in this area."
+title = "Full-stack development"
+description = "Web apps end to end, from Next.js and React frontends to Flask REST APIs backed by PostgreSQL."
+
+[[about.focus_areas]]
+title = "Observability"
+description = "Metrics, logs, and traces with Grafana, Mimir, Loki, and Tempo, built to survive restarts and scaling."
 
 # kind is one of: github, linkedin, email, website, x
 [[socials]]
 kind = "github"
 label = "GitHub"
-url = "https://github.com/TODO"
+url = "https://github.com/danireyss"
 
 [[socials]]
 kind = "linkedin"
 label = "LinkedIn"
-url = "https://www.linkedin.com/in/TODO"
+url = "https://www.linkedin.com/in/danireyss"
 
 [[socials]]
 kind = "email"
 label = "Email"
-url = "mailto:you@example.com"
+url = "mailto:danieljreyes2001@gmail.com"
 
-# Most recent first. Omit `end` on your current job; it becomes the home page's "Current Role".
+# Most recent first. Omit `end` on a current job; it becomes the home page's "Current Role".
 [[experience]]
-company = "TODO Company"
-title = "Software Engineer"
-location = "City, ST"
-start = "Jan 2024"
-summary = "TODO: one-line summary of what you do here."
+company = "Stealth Start-Up (AI Company)"
+title = "Software Engineer Intern"
+location = "Miami, FL"
+start = "Jun 2026"
+end = "Aug 2026"
 bullets = [
-  "TODO: an accomplishment with measurable impact.",
-  "TODO: another accomplishment.",
+  "Migrated an internal build-and-release tool from a single-user local Docker Compose setup to a horizontally scalable ECS Fargate deployment serving all employees, rebuilding the backend as a Python/Flask REST API in a controller/service/repository architecture and aggregating build, test, and artifact data from S3, CodePipeline, and Step Functions via boto3.",
+  "Eliminated long-lived AWS credentials on developer machines by implementing Okta OIDC authentication with role-based access control and a token vending service issuing short-lived scoped credentials per request, limiting each user to only the resources their role permitted.",
+  "Replaced ad-hoc CloudWatch log digging with a unified, VPN-gated observability platform (Grafana, Mimir, Loki, Tempo, Alloy) provisioned as infrastructure-as-code with TypeScript AWS CDK across ECS Fargate, S3, ALB, and PrivateLink, architected for multi-tenant isolation.",
+  "Eliminated data loss during task restarts and scaling events by configuring Mimir, Loki, and Tempo as three-replica clusters using memberlist gossip-protocol coordination for replication and consistent hashing.",
+]
+
+[[experience]]
+company = "Global Empowerment Mission"
+title = "Full-Stack Software Engineer Intern"
+location = "Miami, FL"
+start = "May 2026"
+end = "May 2026"
+bullets = [
+  "Engineered a full-stack warehouse management system for a nonprofit as part of a 6-person team, building a Next.js 16 App Router, TypeScript, and PostgreSQL application with Better Auth session authentication, Prisma ORM, and a TanStack Table inventory dashboard.",
+  "Automated shipment documentation and audit logging, eliminating manual report steps, by integrating Google Drive PDF generation with React PDF and Google Sheets API logging triggered automatically on order creation.",
+  "Designed a normalized relational data model supporting pallets, donors, companies, and warehouses by authoring Prisma migrations, implementing a controller/service/repository architecture in the backend, and building dynamic React dropdowns with real-time add/delete via REST APIs.",
 ]
 
 [[education]]
-school = "TODO University"
-degree = "B.S. Computer Science"
-location = "City, ST"
-start = "2019"
-end = "2023"
+school = "Florida International University"
+degree = "Bachelor of Arts, Computer Science"
+location = "Miami, FL"
+start = "Aug 2024"
+end = "Dec 2026"
+details = [
+  "Cumulative GPA: 3.77/4.0",
+  "Relevant coursework: Data Structures, Algorithm Techniques, Database Management, Advanced Database Management, Computer Architecture, Software Engineering, Operating Systems, Programming I & II",
+]
 
 [[skill_groups]]
-name = "Languages"
-skills = ["TypeScript", "Rust"]
+name = "Programming Languages"
+skills = ["Rust", "Python", "TypeScript", "Java", "SQL"]
+
+[[skill_groups]]
+name = "Frameworks and Libraries"
+skills = ["Next.js", "React", "Flask", "FastAPI", "Express.js", "Tailwind CSS"]
+
+[[skill_groups]]
+name = "Databases"
+skills = ["PostgreSQL", "MySQL"]
 
 [[skill_groups]]
 name = "Tools & Platforms"
-skills = ["AWS", "Docker", "Git"]
+skills = ["AWS", "AWS CDK", "Docker", "Grafana", "Git", "Linux", "Neovim", "Tmux"]
+
+[[awards]]
+title = "Summit Impact Award"
+issuer = "FIU Knight Foundation School of Computing and Information Science"
+date = "Oct 2025"
+details = ["Recognized for delivering measurable impact through open-source contributions."]
+
+# Photo galleries, shown on /photos with Amicro's Time Machine stack, one stack per gallery.
+# A gallery's photos are whatever images are in photos/<folder>/ in the S3 media bucket: the
+# backend lists the folder when the page loads, so adding photos only takes an upload (the S3
+# console, `aws s3 cp`, or `make upload-photos`), not a redeploy. In development they're read
+# from frontend/public/photos/<folder>/ (gitignored). Photos show in file-name order, so name
+# them 01.jpg, 02.jpg, ... A gallery with no photos yet is hidden, and so is the nav link until
+# one has photos.
+#
+# Details per photo are optional, keyed by file name:
+#   [galleries.photos."01.jpg"]
+#   alt = "What's in the photo, for screen readers"   # default: "<title>, photo 1"
+#   caption = "Shown under the stack"
+#   date = "Jun 2026"                                  # label on the timeline scrubber
+
+[[galleries]]
+folder = "stealth-startup"
+title = "Stealth Start-Up (AI Company)"
+description = "Software Engineer Intern · Summer 2026"
+
+[[galleries]]
+folder = "global-empowerment-mission"
+title = "Global Empowerment Mission"
+description = "Full-Stack Software Engineer Intern · May 2026"

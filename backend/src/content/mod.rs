@@ -4,8 +4,9 @@
 mod model;
 
 pub use model::{
-    About, Education, Experience, FocusArea, Link, Profile, Project, ProjectRef, ProjectSummary,
-    SkillGroup, Social, SocialKind, Tag,
+    About, Award, Education, Experience, FocusArea, Gallery, GalleryConfig, Link, Photo,
+    PhotoDetails, Profile, Project, ProjectRef, ProjectSummary, SkillGroup, Social, SocialKind,
+    Tag,
 };
 
 use std::cmp::Reverse;
@@ -34,6 +35,8 @@ pub enum ContentError {
     FrontMatter { file: String },
     #[error("`{file}`: project file names may only use lowercase letters, digits and `-`")]
     InvalidSlug { file: String },
+    #[error("gallery folder `{folder}` may only use lowercase letters, digits and `-`")]
+    InvalidGalleryFolder { folder: String },
 }
 
 #[derive(Debug)]
@@ -75,6 +78,12 @@ impl Content {
             file: "site.toml".into(),
             source,
         })?;
+        // Folders become S3 prefixes and local paths, so keep them to plain slugs.
+        if let Some(gallery) = site.galleries.iter().find(|g| !is_slug(&g.folder)) {
+            return Err(ContentError::InvalidGalleryFolder {
+                folder: gallery.folder.clone(),
+            });
+        }
 
         let mut projects = project_files
             .iter()
@@ -120,6 +129,15 @@ impl Content {
         &self.site.skill_groups
     }
 
+    pub fn awards(&self) -> &[Award] {
+        &self.site.awards
+    }
+
+    /// Gallery settings; the photos themselves are listed from the media folder at request time.
+    pub fn galleries(&self) -> &[GalleryConfig] {
+        &self.site.galleries
+    }
+
     /// The first experience entry without an end date.
     pub fn current_role(&self) -> Option<&Experience> {
         self.site.experience.iter().find(|e| e.end.is_none())
@@ -149,17 +167,20 @@ fn utf8(file: &'static File<'static>) -> Result<&'static str, ContentError> {
     })
 }
 
+/// Lowercase letters, digits, and `-`: safe in URLs, S3 keys, and file paths.
+fn is_slug(s: &str) -> bool {
+    !s.is_empty()
+        && s.bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
 /// Returns the project and its sort key.
 fn parse_project(path: &str, src: &str) -> Result<(i32, Project), ContentError> {
     let slug = Path::new(path)
         .file_stem()
         .and_then(|stem| stem.to_str())
         .unwrap_or_default();
-    let slug_is_valid = !slug.is_empty()
-        && slug
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
-    if !slug_is_valid {
+    if !is_slug(slug) {
         return Err(ContentError::InvalidSlug { file: path.into() });
     }
 
@@ -282,6 +303,32 @@ mod tests {
     }
 
     #[test]
+    fn local_images_exist_in_frontend_public() {
+        let content = Content::load_embedded().unwrap_or_else(|e| panic!("{e}"));
+        let public = Path::new(env!("CARGO_MANIFEST_DIR")).join("../frontend/public");
+        let project_images = content
+            .projects()
+            .iter()
+            .filter_map(|p| p.summary.image.as_deref());
+        // Gallery photos are served from the S3 media bucket and gitignored, so only the
+        // headshot and project images have to be in the repo.
+        let srcs = content
+            .profile()
+            .headshot
+            .as_deref()
+            .into_iter()
+            .chain(project_images);
+        for src in srcs {
+            if let Some(path) = src.strip_prefix('/') {
+                assert!(
+                    public.join(path).is_file(),
+                    "`{src}` isn't in frontend/public/"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn embedded_content_is_valid() {
         let content = Content::load_embedded().unwrap_or_else(|e| panic!("{e}"));
         assert!(!content.profile().name.is_empty());
@@ -352,6 +399,24 @@ mod tests {
             load(&[("projects/a.md", &typo)]),
             Err(ContentError::Toml { .. })
         ));
+    }
+
+    #[test]
+    fn galleries_parse_and_folders_must_be_slugs() {
+        let bad = format!("{SITE}\n[[galleries]]\nfolder = \"../secrets\"\ntitle = \"Bad\"\n");
+        assert!(matches!(
+            Content::from_sources(&bad, &[], None),
+            Err(ContentError::InvalidGalleryFolder { .. })
+        ));
+
+        let good = format!(
+            "{SITE}\n[[galleries]]\nfolder = \"trip\"\ntitle = \"Trip\"\n\n[galleries.photos.\"01.jpg\"]\ncaption = \"Hi\"\n"
+        );
+        let content = Content::from_sources(&good, &[], None).unwrap();
+        assert_eq!(
+            content.galleries()[0].photos["01.jpg"].caption.as_deref(),
+            Some("Hi")
+        );
     }
 
     #[test]

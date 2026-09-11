@@ -1,5 +1,6 @@
 //! HTTP-level tests against the full router, with fixture content and a recording mailer.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -9,6 +10,7 @@ use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
 use portfolio_api::content::Content;
 use portfolio_api::email::{ContactMessage, MailError, Mailer};
+use portfolio_api::photos::{PhotoStore, PhotoStoreError};
 use portfolio_api::{AppState, app};
 use serde_json::{Value, json};
 use tower::ServiceExt;
@@ -29,6 +31,14 @@ const SITE: &str = r#"
     title = "Engineer"
     location = "Remote"
     start = "2022"
+
+    [[galleries]]
+    folder = "trip"
+    title = "Trip"
+
+    [galleries.photos."02.jpg"]
+    caption = "Second"
+    date = "Jul 2026"
 "#;
 
 const ALPHA: &str = "+++\ntitle = \"Alpha\"\ncategory = \"C\"\nsummary = \"S\"\ntags = [\"Rust\", \"AWS\"]\norder = 1\n+++\nAlpha body.\n";
@@ -52,6 +62,24 @@ impl Mailer for RecordingMailer {
     }
 }
 
+/// Serves fixed file lists per folder, or fails every call.
+#[derive(Default)]
+struct FakePhotoStore {
+    folders: HashMap<&'static str, Vec<&'static str>>,
+    fail: bool,
+}
+
+#[async_trait]
+impl PhotoStore for FakePhotoStore {
+    async fn list(&self, folder: &str) -> Result<Vec<String>, PhotoStoreError> {
+        if self.fail {
+            return Err(PhotoStoreError("S3 is down".into()));
+        }
+        let files = self.folders.get(folder).cloned().unwrap_or_default();
+        Ok(files.into_iter().map(String::from).collect())
+    }
+}
+
 struct TestApp {
     router: Router,
     mailer: Arc<RecordingMailer>,
@@ -59,6 +87,18 @@ struct TestApp {
 
 impl TestApp {
     fn new(mailer: RecordingMailer, pdf: Option<&'static [u8]>) -> Self {
+        let photos = FakePhotoStore {
+            folders: HashMap::from([("trip", vec!["01.jpg", "02.jpg"])]),
+            fail: false,
+        };
+        Self::with_photos(mailer, pdf, photos)
+    }
+
+    fn with_photos(
+        mailer: RecordingMailer,
+        pdf: Option<&'static [u8]>,
+        photos: FakePhotoStore,
+    ) -> Self {
         let projects = [
             ("projects/alpha.md".to_owned(), ALPHA),
             ("projects/beta.md".to_owned(), BETA),
@@ -68,6 +108,7 @@ impl TestApp {
         let router = app(AppState {
             content: Arc::new(content),
             mailer: mailer.clone(),
+            photos: Arc::new(photos),
         });
         Self { router, mailer }
     }
@@ -212,6 +253,36 @@ async fn resume_pdf_404s_when_missing() {
     assert_eq!(json["has_pdf"], false);
     let (status, _, _) = app.get("/api/resume.pdf").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn photos_lists_each_gallery_folder_with_optional_details() {
+    let (status, json) = default_app().get_json("/api/photos").await;
+    assert_eq!(status, StatusCode::OK);
+    let gallery = &json["galleries"][0];
+    assert_eq!(gallery["title"], "Trip");
+    assert_eq!(
+        gallery["photos"],
+        json!([
+            { "src": "/photos/trip/01.jpg", "alt": "Trip, photo 1", "caption": null, "date": null },
+            { "src": "/photos/trip/02.jpg", "alt": "Trip, photo 2", "caption": "Second", "date": "Jul 2026" },
+        ])
+    );
+}
+
+#[tokio::test]
+async fn photos_store_failure_is_500() {
+    let app = TestApp::with_photos(
+        RecordingMailer::default(),
+        None,
+        FakePhotoStore {
+            fail: true,
+            ..Default::default()
+        },
+    );
+    let (status, json) = app.get_json("/api/photos").await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(json["error"], "Couldn't load photos right now.");
 }
 
 #[tokio::test]

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 async-trait = "0.1.92"
 aws-config = { version = "1.12.0", features = ["behavior-version-latest"] }
+aws-sdk-s3 = "1.146.1"
 aws-sdk-sesv2 = "1.133.0"
 axum = "0.8.9"
 include_dir = "0.7.4"

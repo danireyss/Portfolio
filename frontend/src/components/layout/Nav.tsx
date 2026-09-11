@@ -2,7 +2,7 @@ import { Menu } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { useSite } from '@/api/queries'
+import { usePhotos, useSite } from '@/api/queries'
 import { Button } from '@/components/ui/button'
 import {
   NavigationMenu,
@@ -13,12 +13,15 @@ import {
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
 
-const LINKS = [
+type NavItem = { to: string; label: string; needsGalleries?: boolean }
+
+const LINKS: NavItem[] = [
   { to: '/', label: 'Home' },
   { to: '/projects', label: 'Projects' },
+  { to: '/photos', label: 'Photos', needsGalleries: true },
   { to: '/resume', label: 'Resume' },
   { to: '/contact', label: 'Contact' },
-] as const
+]
 
 export function Nav() {
   const { data } = useSite()
@@ -26,6 +29,10 @@ export function Nav() {
   const [menuOpen, setMenuOpen] = useState(false)
   const isActive = (to: string) => (to === '/' ? pathname === '/' : pathname.startsWith(to))
   const name = data?.profile.name ?? ''
+  // The Photos link appears once a gallery's media folder actually has photos in it.
+  const photos = usePhotos()
+  const hasGalleries = photos.data?.galleries.some((gallery) => gallery.photos.length > 0) ?? false
+  const links = LINKS.filter((link) => !link.needsGalleries || hasGalleries)
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 h-[70px] border-b border-border/60 bg-background/80 backdrop-blur">
@@ -36,7 +43,7 @@ export function Nav() {
 
         <NavigationMenu viewport={false} className="hidden md:flex" aria-label="Main">
           <NavigationMenuList>
-            {LINKS.map(({ to, label }) => (
+            {links.map(({ to, label }) => (
               <NavigationMenuItem key={to}>
                 <NavigationMenuLink asChild active={isActive(to)}>
                   <Link to={to} className="relative bg-transparent hover:bg-transparent data-[active=true]:bg-transparent data-[active=true]:text-primary">
@@ -66,7 +73,7 @@ export function Nav() {
               <SheetTitle className="font-heading">{name || 'Menu'}</SheetTitle>
             </SheetHeader>
             <nav aria-label="Main" className="flex flex-col gap-1 px-4">
-              {LINKS.map(({ to, label }) => (
+              {links.map(({ to, label }) => (
                 <Link
                   key={to}
                   to={to}

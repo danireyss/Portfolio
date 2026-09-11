@@ -1,5 +1,6 @@
 import type { ContactRequest } from './types/ContactRequest'
 import type { ErrorBody } from './types/ErrorBody'
+import type { PhotosResponse } from './types/PhotosResponse'
 import type { Project } from './types/Project'
 import type { ProjectsResponse } from './types/ProjectsResponse'
 import type { ResumeResponse } from './types/ResumeResponse'
@@ -44,6 +45,7 @@ export const api = {
   project: (slug: string) =>
     request<Project>(`/projects/${encodeURIComponent(slug)}`),
   resume: () => request<ResumeResponse>('/resume'),
+  photos: () => request<PhotosResponse>('/photos'),
   contact: (body: ContactRequest) =>
     request<void>('/contact', {
       method: 'POST',
