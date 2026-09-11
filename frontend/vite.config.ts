@@ -11,8 +11,9 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   server: {
-    // The Axum backend runs on :3000 in dev (`cargo run` in backend/).
-    proxy: { '/api': 'http://localhost:3000' },
+    // The Axum backend runs on :3000 in dev (`cargo run` in backend/); `make dev-otel` moves it
+    // to API_PORT=3001 because the telemetry stack's Grafana uses :3000.
+    proxy: { '/api': `http://localhost:${process.env.API_PORT ?? 3000}` },
   },
   test: {
     environment: 'jsdom',

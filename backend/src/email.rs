@@ -66,6 +66,8 @@ impl SesMailer {
 
 #[async_trait]
 impl Mailer for SesMailer {
+    // No fields: the message holds the visitor's name and email address.
+    #[tracing::instrument(name = "ses.send_email", skip_all, err)]
     async fn send(&self, m: &ContactMessage) -> Result<(), MailError> {
         let text = |data: String| {
             EmailText::builder()

@@ -3,6 +3,7 @@ pub mod email;
 mod error;
 pub mod photos;
 mod routes;
+pub mod telemetry;
 
 use std::sync::Arc;
 
@@ -25,5 +26,11 @@ pub fn app(state: AppState) -> Router {
     Router::new()
         .nest("/api", routes::router())
         .with_state(state)
-        .layer(TraceLayer::new_for_http())
+        // Router::layer wraps each route, so both see the matched route template.
+        .layer(axum::middleware::from_fn(telemetry::track_request))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(telemetry::request_span)
+                .on_response(telemetry::on_response),
+        )
 }

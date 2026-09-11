@@ -7,6 +7,7 @@ use ts_rs::TS;
 use crate::AppState;
 use crate::email::ContactMessage;
 use crate::error::{AppError, FieldError};
+use crate::telemetry::record_contact;
 
 /// Submissions faster than this are almost certainly bots.
 const MIN_FILL_MS: u32 = 3_000;
@@ -43,11 +44,17 @@ pub(crate) async fn send(
             elapsed_ms = request.elapsed_ms,
             "dropped likely-spam contact submission"
         );
+        record_contact("spam");
         return Ok(StatusCode::NO_CONTENT);
     }
 
-    let message = validate(&request)?;
-    state.mailer.send(&message).await?;
+    let message = validate(&request).inspect_err(|_| record_contact("invalid"))?;
+    state
+        .mailer
+        .send(&message)
+        .await
+        .inspect_err(|_| record_contact("failed"))?;
+    record_contact("sent");
     Ok(StatusCode::NO_CONTENT)
 }
 

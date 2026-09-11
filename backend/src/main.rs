@@ -4,17 +4,32 @@ use std::sync::Arc;
 use portfolio_api::content::Content;
 use portfolio_api::email::{LogMailer, Mailer, SesMailer};
 use portfolio_api::photos::{LocalPhotoStore, PhotoStore, S3PhotoStore};
+use portfolio_api::telemetry::Telemetry;
 use portfolio_api::{AppState, app};
-use tracing_subscriber::EnvFilter;
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
-#[tokio::main]
-async fn main() -> Result<(), Error> {
+fn main() -> Result<(), Error> {
     // Set by the Lambda runtime; absent when running locally.
     let on_lambda = std::env::var_os("AWS_LAMBDA_RUNTIME_API").is_some();
-    init_tracing(on_lambda);
+    // Before the async runtime starts: the OTLP exporter's blocking HTTP client can't be created
+    // inside it.
+    let telemetry = Telemetry::init(on_lambda)?;
+    if telemetry.is_exporting() {
+        let endpoint = std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT").unwrap_or_default();
+        tracing::info!(%endpoint, "exporting OpenTelemetry traces, metrics, and logs");
+    }
 
+    let result = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run(on_lambda));
+    // The runtime has stopped; flush whatever telemetry is still batched.
+    telemetry.shutdown();
+    result
+}
+
+async fn run(on_lambda: bool) -> Result<(), Error> {
     let content = Arc::new(Content::load_embedded()?);
     let mailer: Arc<dyn Mailer> = match SesMailer::from_env().await? {
         Some(ses) => Arc::new(ses),
@@ -49,26 +64,29 @@ async fn main() -> Result<(), Error> {
     let addr = SocketAddr::from(([127, 0, 0, 1], port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
     tracing::info!("listening on http://{addr}");
-    axum::serve(listener, app).await?;
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await?;
     Ok(())
 }
 
-fn init_tracing(on_lambda: bool) {
-    let default_filter = if on_lambda {
-        "info"
-    } else {
-        "portfolio_api=debug,tower_http=debug,info"
+/// Resolves on Ctrl+C or SIGTERM (`make dev` stops with either), so pending telemetry is
+/// flushed instead of lost.
+async fn shutdown_signal() {
+    let ctrl_c = tokio::signal::ctrl_c();
+    #[cfg(unix)]
+    let terminate = async {
+        use tokio::signal::unix::{SignalKind, signal};
+        if let Ok(mut sigterm) = signal(SignalKind::terminate()) {
+            sigterm.recv().await;
+        }
     };
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| default_filter.into());
-    if on_lambda {
-        // CloudWatch adds its own timestamps and doesn't render ANSI colors.
-        tracing_subscriber::fmt()
-            .json()
-            .with_env_filter(filter)
-            .without_time()
-            .with_ansi(false)
-            .init();
-    } else {
-        tracing_subscriber::fmt().with_env_filter(filter).init();
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {}
+        () = terminate => {}
     }
+    tracing::info!("shutting down");
 }
