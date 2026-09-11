@@ -1,18 +1,20 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useSearchParams } from 'react-router'
 import { useProjects } from '@/api/queries'
+import type { ProjectsResponse } from '@/api/types/ProjectsResponse'
 import { PageMeta } from '@/components/PageMeta'
-import { ErrorState, PageSkeleton } from '@/components/PageState'
-import { ProjectCard } from '@/components/ProjectCard'
-import { TagFilter } from '@/components/TagFilter'
+import { QueryState } from '@/components/QueryState'
 import { EASE_OUT } from '@/lib/motion'
+import { ProjectCard } from './ProjectCard'
+import { TagFilter } from './TagFilter'
 
-export function Projects() {
-  const { data, error, isPending, refetch } = useProjects()
+export function ProjectsPage() {
+  const projects = useProjects()
+  return <QueryState query={projects}>{(data) => <ProjectList data={data} />}</QueryState>
+}
+
+function ProjectList({ data }: { data: ProjectsResponse }) {
   const [searchParams, setSearchParams] = useSearchParams()
-
-  if (isPending) return <PageSkeleton />
-  if (error) return <ErrorState onRetry={() => refetch()} />
 
   // `?tag=` is case-insensitive so /projects?tag=rust matches "Rust".
   const tagParam = searchParams.get('tag')?.toLowerCase()

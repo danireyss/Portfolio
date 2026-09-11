@@ -14,7 +14,7 @@ import './index.css'
 import { createQueryClient } from '@/api/queries'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { App } from './App'
+import { App } from '@/app/App'
 
 const queryClient = createQueryClient()
 

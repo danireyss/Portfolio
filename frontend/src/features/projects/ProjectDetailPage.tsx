@@ -1,31 +1,36 @@
 import { ArrowLeft, ArrowUpRight } from 'lucide-react'
 import { Link, useParams } from 'react-router'
-import { isNotFound } from '@/api/client'
 import { useProject } from '@/api/queries'
+import type { Project } from '@/api/types/Project'
+import { NotFound } from '@/components/NotFound'
 import { PageMeta } from '@/components/PageMeta'
-import { ErrorState, PageSkeleton } from '@/components/PageState'
+import { QueryState } from '@/components/QueryState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { externalLinkProps } from '@/lib/format'
-import { NotFound } from './NotFound'
 
-export function ProjectDetail() {
+export function ProjectDetailPage() {
   const { slug = '' } = useParams()
-  const { data: project, error, isPending, refetch } = useProject(slug)
+  const project = useProject(slug)
 
-  if (isPending) return <PageSkeleton />
-  if (isNotFound(error)) {
-    return (
-      <NotFound
-        title="Project not found"
-        message="That project doesn't exist, or it's been renamed."
-        backTo={{ to: '/projects', label: 'All projects' }}
-      />
-    )
-  }
-  if (error) return <ErrorState onRetry={() => refetch()} />
+  return (
+    <QueryState
+      query={project}
+      notFound={
+        <NotFound
+          title="Project not found"
+          message="That project doesn't exist, or it's been renamed."
+          backTo={{ to: '/projects', label: 'All projects' }}
+        />
+      }
+    >
+      {(project) => <ProjectArticle project={project} />}
+    </QueryState>
+  )
+}
 
+function ProjectArticle({ project }: { project: Project }) {
   return (
     <article className="py-12 md:py-16">
       <PageMeta title={project.title} description={project.summary} />
@@ -68,11 +73,7 @@ export function ProjectDetail() {
       </header>
 
       {project.image && (
-        <img
-          src={project.image}
-          alt=""
-          className="mt-10 w-full rounded-lg border border-border"
-        />
+        <img src={project.image} alt="" className="mt-10 w-full rounded-lg border border-border" />
       )}
 
       <Separator className="my-10" />
