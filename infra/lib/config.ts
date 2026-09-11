@@ -9,6 +9,13 @@ export const config = {
    * verify it, so click the link in the email AWS sends.
    */
   contactEmail: 'danieljreyes2001@gmail.com',
-  /** Only pushes to this repo and branch may assume the GitHub Actions deploy role. */
-  github: { repository: 'danireyss/Portfolio', branch: 'main' },
+  /**
+   * Only pushes to this repo and branch may assume the GitHub Actions deploy role. The repo uses
+   * GitHub's immutable OIDC subjects, which identify the owner and repo by numeric ID as well as
+   * name (see `gh api repos/danireyss/Portfolio/actions/oidc/customization/sub`).
+   */
+  github: {
+    repository: { owner: 'danireyss', ownerId: 137007934, name: 'Portfolio', id: 1366454259 },
+    branch: 'main',
+  },
 } as const

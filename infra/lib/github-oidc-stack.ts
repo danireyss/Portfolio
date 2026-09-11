@@ -3,11 +3,19 @@ import * as iam from 'aws-cdk-lib/aws-iam'
 import type { Construct } from 'constructs'
 
 export interface GithubOidcStackProps extends StackProps {
-  /** "owner/name", e.g. "danireyss/Portfolio". */
-  repository: string
+  /** The repository whose workflows may deploy, with the numeric IDs GitHub puts in its tokens. */
+  repository: { owner: string; ownerId: number; name: string; id: number }
   /** Only workflow runs on this branch may assume the role. */
   branch: string
 }
+
+/**
+ * GitHub's immutable OIDC subject for pushes to `branch`, e.g.
+ * "repo:danireyss@137007934/Portfolio@1366454259:ref:refs/heads/main". Unlike the name-only
+ * form, a new repository that reuses the same owner/name can't match it.
+ */
+export const githubSubject = ({ repository: r, branch }: Pick<GithubOidcStackProps, 'repository' | 'branch'>) =>
+  `repo:${r.owner}@${r.ownerId}/${r.name}@${r.id}:ref:refs/heads/${branch}`
 
 /**
  * GitHub's OIDC identity provider plus a deploy role for GitHub Actions, so the deploy workflow
@@ -29,12 +37,12 @@ export class GithubOidcStack extends Stack {
 
     const role = new iam.Role(this, 'DeployRole', {
       roleName: 'portfolio-github-deploy',
-      description: `GitHub Actions deploys from ${props.repository}@${props.branch}`,
+      description: `GitHub Actions deploys from ${props.repository.owner}/${props.repository.name}@${props.branch}`,
       maxSessionDuration: Duration.hours(1),
       assumedBy: new iam.WebIdentityPrincipal(provider.oidcProviderArn, {
         StringEquals: {
           [`${issuer}:aud`]: 'sts.amazonaws.com',
-          [`${issuer}:sub`]: `repo:${props.repository}:ref:refs/heads/${props.branch}`,
+          [`${issuer}:sub`]: githubSubject(props),
         },
       }),
     })
