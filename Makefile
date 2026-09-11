@@ -1,4 +1,4 @@
-.PHONY: dev backend frontend test build build-frontend build-backend synth deploy upload-photos
+.PHONY: dev backend frontend test build build-frontend build-backend synth deploy deploy-github-role upload-photos
 
 # Run the Axum API (:3000) and the Vite dev server (:5173) together.
 dev:
@@ -16,7 +16,7 @@ frontend:
 test:
 	cd backend && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 	cd frontend && npm run lint && npm run typecheck && npm test
-	cd infra && npx cdk synth --quiet
+	cd infra && npx tsc --noEmit && npm test
 
 build: build-frontend build-backend
 
@@ -32,6 +32,11 @@ synth:
 
 deploy: build
 	cd infra && npx cdk deploy PortfolioStack
+
+# One-time: lets GitHub Actions deploy via OIDC. Save the DeployRoleArn output as the
+# repository variable AWS_DEPLOY_ROLE_ARN.
+deploy-github-role: build
+	cd infra && npx cdk deploy PortfolioGithubOidc
 
 # Gallery photos aren't in git; sync the local copy to the media bucket (created by PortfolioStack).
 MEDIA_BUCKET ?= $(shell aws cloudformation describe-stacks --stack-name PortfolioStack \
