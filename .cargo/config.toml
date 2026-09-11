@@ -1,0 +1,5 @@
+[env]
+# `cargo test` in backend/ writes the ts-rs bindings for API types here. This lives at the repo
+# root so it applies whether cargo runs from here (e.g. `--manifest-path backend/Cargo.toml` in
+# CI) or from backend/.
+TS_RS_EXPORT_DIR = { value = "frontend/src/api/types", relative = true }

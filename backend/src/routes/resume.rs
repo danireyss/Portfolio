@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::AppState;
-use crate::content::{Education, Experience, Profile, SkillGroup, Social};
+use crate::content::{Award, Education, Experience, Profile, SkillGroup, Social};
 use crate::error::AppError;
 
 #[derive(Serialize, TS)]
@@ -17,6 +17,7 @@ pub struct ResumeResponse<'a> {
     pub experience: &'a [Experience],
     pub education: &'a [Education],
     pub skill_groups: &'a [SkillGroup],
+    pub awards: &'a [Award],
     /// Whether `/api/resume.pdf` is available.
     pub has_pdf: bool,
 }
@@ -29,6 +30,7 @@ pub(crate) async fn resume(State(state): State<AppState>) -> Response {
         experience: content.experience(),
         education: content.education(),
         skill_groups: content.skill_groups(),
+        awards: content.awards(),
         has_pdf: content.resume_pdf().is_some(),
     })
     .into_response()

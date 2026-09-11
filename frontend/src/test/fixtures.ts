@@ -1,3 +1,4 @@
+import type { PhotosResponse } from '@/api/types/PhotosResponse'
 import type { Project } from '@/api/types/Project'
 import type { ProjectSummary } from '@/api/types/ProjectSummary'
 import type { ProjectsResponse } from '@/api/types/ProjectsResponse'
@@ -63,3 +64,18 @@ const beta: ProjectSummary = {
 export const projects: ProjectsResponse = { projects: [alpha, beta], tags: site.skills }
 
 export const alphaDetail: Project = { ...alpha, body_html: '<h2>How it works</h2><p>Details.</p>' }
+
+export const photosResponse: PhotosResponse = {
+  galleries: [
+    {
+      title: 'Summer internship',
+      description: null,
+      photos: [
+        { src: '/photos/one.jpg', alt: 'Team standup', caption: 'Day one', date: 'Jun 2026' },
+        { src: '/photos/two.jpg', alt: 'Whiteboard session', caption: null, date: 'Jul 2026' },
+      ],
+    },
+    // A gallery whose folder is still empty; the page should skip it.
+    { title: 'Empty', description: null, photos: [] },
+  ],
+}

@@ -1,7 +1,8 @@
-import { ArrowUpRight, Download } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 import { Fragment, type ReactNode } from 'react'
 import { RESUME_PDF_URL } from '@/api/client'
 import { useResume } from '@/api/queries'
+import { DownloadButton } from '@/components/DownloadButton'
 import { PageMeta } from '@/components/PageMeta'
 import { ErrorState, PageSkeleton } from '@/components/PageState'
 import { Reveal } from '@/components/Reveal'
@@ -15,7 +16,7 @@ export function Resume() {
   if (isPending) return <PageSkeleton />
   if (error) return <ErrorState onRetry={() => refetch()} />
 
-  const { profile, experience, education, skill_groups, has_pdf } = data
+  const { profile, experience, education, skill_groups, awards, has_pdf } = data
 
   return (
     <>
@@ -30,13 +31,7 @@ export function Resume() {
         </div>
         {has_pdf && (
           <div className="flex flex-wrap gap-2">
-            {/* Step 5 swaps this for Amicro's download button. */}
-            <Button asChild>
-              <a href={`${RESUME_PDF_URL}?download=1`} download>
-                <Download data-icon="inline-start" />
-                Download PDF
-              </a>
-            </Button>
+            <DownloadButton href={`${RESUME_PDF_URL}?download=1`}>Download PDF</DownloadButton>
             <Button asChild variant="outline">
               <a href={RESUME_PDF_URL} target="_blank" rel="noreferrer">
                 Open in new tab
@@ -87,6 +82,20 @@ export function Resume() {
                 </Fragment>
               ))}
             </dl>
+          </ResumeSection>
+        )}
+
+        {awards.length > 0 && (
+          <ResumeSection title="Awards">
+            {awards.map((award) => (
+              <ResumeEntry
+                key={`${award.title}-${award.date}`}
+                title={award.title}
+                org={award.issuer}
+                meta={award.date}
+                bullets={award.details}
+              />
+            ))}
           </ResumeSection>
         )}
       </div>

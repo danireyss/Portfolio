@@ -5,7 +5,7 @@ summary = "My portfolio: a React + TypeScript frontend and a Rust Axum API, runn
 tags = ["Rust", "Axum", "TypeScript", "React", "AWS", "CDK"]
 featured = true
 order = 1
-links = [{ label = "Source", url = "https://github.com/TODO/portfolio" }]
+links = [{ label = "Source", url = "https://github.com/danireyss/Portfolio" }]
 +++
 
 ## Architecture

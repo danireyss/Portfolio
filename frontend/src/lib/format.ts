@@ -1,6 +1,6 @@
-/** "Jun 2023 – Present" */
+/** "Jun 2023 – Present", or just "May 2026" when a role starts and ends in the same month. */
 export const formatDates = (start: string, end: string | null) =>
-  `${start} – ${end ?? 'Present'}`
+  start === end ? start : `${start} – ${end ?? 'Present'}`
 
 /** "Daniel Reyes" -> "DR" */
 export const initials = (name: string) =>

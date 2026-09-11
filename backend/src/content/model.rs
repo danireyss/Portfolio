@@ -1,6 +1,8 @@
 //! Content types. Every type deriving `TS` is exported to `frontend/src/api/types/`
 //! when `cargo test` runs, so the frontend's types always match the API.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
@@ -18,6 +20,10 @@ pub(crate) struct SiteFile {
     pub education: Vec<Education>,
     #[serde(default)]
     pub skill_groups: Vec<SkillGroup>,
+    #[serde(default)]
+    pub awards: Vec<Award>,
+    #[serde(default)]
+    pub galleries: Vec<GalleryConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -111,6 +117,61 @@ pub struct Education {
 pub struct SkillGroup {
     pub name: String,
     pub skills: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(deny_unknown_fields)]
+#[ts(export)]
+pub struct Award {
+    pub title: String,
+    pub issuer: String,
+    /// Display date, e.g. "Oct 2025".
+    pub date: String,
+    #[serde(default)]
+    pub details: Vec<String>,
+}
+
+/// A `[[galleries]]` entry in site.toml. Its photos aren't listed here: they're whatever images
+/// are in `photos/<folder>/` in the media bucket, listed when /api/photos is requested.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GalleryConfig {
+    /// Folder under `photos/`, e.g. "stealth-startup".
+    pub folder: String,
+    pub title: String,
+    pub description: Option<String>,
+    /// Optional details per photo, keyed by file name ("01.jpg").
+    #[serde(default)]
+    pub photos: BTreeMap<String, PhotoDetails>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PhotoDetails {
+    pub alt: Option<String>,
+    pub caption: Option<String>,
+    pub date: Option<String>,
+}
+
+/// A gallery as served by /api/photos: its settings plus the photos found in its folder.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct Gallery {
+    pub title: String,
+    pub description: Option<String>,
+    pub photos: Vec<Photo>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct Photo {
+    /// Image URL, e.g. "/photos/stealth-startup/01.jpg" (served from the media bucket).
+    pub src: String,
+    /// Describes the photo for screen readers.
+    pub alt: String,
+    pub caption: Option<String>,
+    /// Label on the Time Machine scrubber, e.g. "Jun 2026".
+    pub date: Option<String>,
 }
 
 /// TOML front matter at the top of `content/projects/<slug>.md`.

@@ -1,18 +1,21 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
-import { alphaDetail, projects, site } from '@/test/fixtures'
+import { alphaDetail, photosResponse, projects, site } from '@/test/fixtures'
 import { jsonResponse, mockApi, renderApp } from '@/test/utils'
 
 describe('home', () => {
-  it('shows the profile and only featured projects', async () => {
+  it('shows the profile and a cover flow of featured-first projects', async () => {
     mockApi({ '/api/site': site, '/api/projects': projects })
     renderApp('/')
 
     expect(await screen.findByRole('heading', { level: 1, name: /Test Person/ })).toBeInTheDocument()
     expect(screen.getByText('Builds the platform.')).toBeInTheDocument()
-    expect(await screen.findByRole('link', { name: 'Alpha' })).toHaveAttribute('href', '/projects/alpha')
-    expect(screen.queryByRole('link', { name: 'Beta' })).not.toBeInTheDocument()
+
+    // Only Alpha is featured, so Beta fills in after it.
+    const showcase = await screen.findByRole('region', { name: 'Project showcase' })
+    expect(within(showcase).getByRole('button', { current: true })).toHaveAccessibleName('Show Alpha')
+    expect(within(showcase).getByRole('button', { name: 'Show Beta' })).toBeInTheDocument()
   })
 })
 
@@ -42,6 +45,39 @@ describe('projects', () => {
 
     expect(await screen.findByRole('heading', { name: 'Project not found' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /All projects/ })).toHaveAttribute('href', '/projects')
+  })
+})
+
+describe('photos', () => {
+  it('links to Photos and steps through the time machine', async () => {
+    mockApi({ '/api/site': site, '/api/photos': photosResponse })
+    renderApp('/photos')
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Summer internship' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 2, name: 'Empty' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Photos' })).toHaveAttribute('href', '/photos')
+
+    // Photos behind the active one are aria-hidden, so only the active image is exposed.
+    const current = () => screen.getByRole('button', { current: true })
+    expect(current()).toHaveAccessibleName('Jun 2026: Day one')
+    expect(screen.getByRole('img', { name: 'Team standup' })).toBeInTheDocument()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Jul 2026: Whiteboard session' }))
+    expect(current()).toHaveAccessibleName('Jul 2026: Whiteboard session')
+    expect(screen.getByRole('img', { name: 'Whiteboard session' })).toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Team standup' })).not.toBeInTheDocument()
+  })
+
+  it('hides the Photos link until a gallery has photos', async () => {
+    mockApi({
+      '/api/site': site,
+      '/api/projects': projects,
+      '/api/photos': { galleries: [{ title: 'Empty', description: null, photos: [] }] },
+    })
+    renderApp('/')
+
+    expect(await screen.findByRole('link', { name: 'Projects' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Photos' })).not.toBeInTheDocument()
   })
 })
 

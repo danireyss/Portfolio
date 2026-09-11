@@ -24,4 +24,7 @@ export const useProject = (slug: string) =>
 export const useResume = () =>
   useQuery({ queryKey: ['resume'], queryFn: api.resume })
 
+export const usePhotos = () =>
+  useQuery({ queryKey: ['photos'], queryFn: api.photos })
+
 export const useSendContact = () => useMutation({ mutationFn: api.contact })
