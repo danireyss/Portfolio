@@ -1,0 +1,69 @@
+# Site content, served by the API (backend/src/content) and rendered by the frontend.
+# Unknown keys are rejected, so a typo fails `cargo test` instead of silently disappearing.
+# TODO(Daniel): replace every placeholder below with your real content.
+
+[profile]
+name = "Daniel Reyes"
+headline = "Software Engineer"
+location = "City, ST"
+tagline = "TODO: one or two sentences about what you build and what you care about."
+email = "you@example.com"
+# Put the image in frontend/public/ and reference it from the site root:
+# headshot = "/headshot.jpg"
+
+[about]
+background = [
+  "TODO: a short paragraph about your education and background.",
+  "TODO: a second paragraph about what drives you as an engineer.",
+]
+
+[[about.focus_areas]]
+title = "TODO: Focus area"
+description = "TODO: what you do in this area."
+
+[[about.focus_areas]]
+title = "TODO: Another focus area"
+description = "TODO: what you do in this area."
+
+# kind is one of: github, linkedin, email, website, x
+[[socials]]
+kind = "github"
+label = "GitHub"
+url = "https://github.com/TODO"
+
+[[socials]]
+kind = "linkedin"
+label = "LinkedIn"
+url = "https://www.linkedin.com/in/TODO"
+
+[[socials]]
+kind = "email"
+label = "Email"
+url = "mailto:you@example.com"
+
+# Most recent first. Omit `end` on your current job; it becomes the home page's "Current Role".
+[[experience]]
+company = "TODO Company"
+title = "Software Engineer"
+location = "City, ST"
+start = "Jan 2024"
+summary = "TODO: one-line summary of what you do here."
+bullets = [
+  "TODO: an accomplishment with measurable impact.",
+  "TODO: another accomplishment.",
+]
+
+[[education]]
+school = "TODO University"
+degree = "B.S. Computer Science"
+location = "City, ST"
+start = "2019"
+end = "2023"
+
+[[skill_groups]]
+name = "Languages"
+skills = ["TypeScript", "Rust"]
+
+[[skill_groups]]
+name = "Tools & Platforms"
+skills = ["AWS", "Docker", "Git"]
