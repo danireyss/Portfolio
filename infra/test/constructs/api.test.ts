@@ -15,6 +15,7 @@ test('runs as an arm64 custom-runtime Lambda with the contact address and extra 
     Runtime: 'provided.al2023',
     Architectures: ['arm64'],
     Handler: 'bootstrap',
+    MemorySize: 1024,
     Environment: {
       Variables: {
         CONTACT_TO_EMAIL: 'me@example.com',

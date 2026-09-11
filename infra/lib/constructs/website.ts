@@ -106,8 +106,9 @@ export class Website extends Construct {
    * Uploads the build in two parts. Vite's hashed bundles (`assets/`) never change, so browsers
    * may cache them for a year; they go up first and are never pruned, so a page loaded before a
    * deploy can still fetch its bundles. Everything else (index.html, favicon, headshot) is
-   * revalidated on every visit, and uploading it invalidates CloudFront. Local gallery photos are
-   * skipped: they belong in the media bucket.
+   * revalidated by browsers on every visit, but CloudFront keeps it (`s-maxage`) until the next
+   * deploy invalidates `/*`, so those revalidations are answered at the edge instead of going
+   * back to S3. Local gallery photos are skipped: they belong in the media bucket.
    */
   private upload(bucket: s3.IBucket, assetPath: string) {
     const assets = new s3deploy.BucketDeployment(this, 'DeployAssets', {
@@ -120,7 +121,9 @@ export class Website extends Construct {
     const site = new s3deploy.BucketDeployment(this, 'DeploySite', {
       sources: [s3deploy.Source.asset(assetPath, { exclude: ['assets/**', 'photos/**'] })],
       destinationBucket: bucket,
-      cacheControl: [s3deploy.CacheControl.fromString('public, max-age=0, must-revalidate')],
+      cacheControl: [
+        s3deploy.CacheControl.fromString('public, max-age=0, s-maxage=31536000, must-revalidate'),
+      ],
       prune: false,
       distribution: this.distribution,
       distributionPaths: ['/*'],

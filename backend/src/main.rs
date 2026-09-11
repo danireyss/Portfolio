@@ -1,9 +1,10 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use portfolio_api::content::Content;
 use portfolio_api::email::{LogMailer, Mailer, SesMailer};
-use portfolio_api::photos::{LocalPhotoStore, PhotoStore, S3PhotoStore};
+use portfolio_api::photos::{CachedPhotoStore, LocalPhotoStore, PhotoStore, S3PhotoStore};
 use portfolio_api::telemetry::Telemetry;
 use portfolio_api::{AppState, app};
 
@@ -41,7 +42,8 @@ async fn run(on_lambda: bool) -> Result<(), Error> {
         }
     };
     let photos: Arc<dyn PhotoStore> = match S3PhotoStore::from_env().await {
-        Some(s3) => Arc::new(s3),
+        // Warm Lambda instances reuse a listing for a minute instead of calling S3 per request.
+        Some(s3) => Arc::new(CachedPhotoStore::new(s3, Duration::from_secs(60))),
         None => {
             // `make dev` runs from backend/, next to the frontend's (gitignored) photos folder.
             let dir =
