@@ -84,7 +84,8 @@ describe('photos', () => {
 describe('contact form', () => {
   async function fillAndSubmit() {
     const user = userEvent.setup()
-    await user.type(screen.getByLabelText('Name'), 'Visitor')
+    // The contact page is lazy-loaded, so wait for the form to appear.
+    await user.type(await screen.findByLabelText('Name'), 'Visitor')
     await user.type(screen.getByLabelText('Email'), 'visitor@example.com')
     await user.type(screen.getByLabelText('Message'), 'Hello there, nice site!')
     await user.click(screen.getByRole('button', { name: /send message/i }))
@@ -99,7 +100,7 @@ describe('contact form', () => {
     const contactCalls = () =>
       fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/api/contact'))
 
-    await userEvent.setup().click(screen.getByRole('button', { name: /send message/i }))
+    await userEvent.setup().click(await screen.findByRole('button', { name: /send message/i }))
     expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument()
     expect(screen.getByLabelText('Email')).toHaveAttribute('aria-invalid', 'true')
     expect(contactCalls()).toHaveLength(0)

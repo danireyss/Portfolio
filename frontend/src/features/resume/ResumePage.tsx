@@ -1,22 +1,22 @@
 import { ArrowUpRight } from 'lucide-react'
-import { Fragment, type ReactNode } from 'react'
+import { Fragment } from 'react'
 import { RESUME_PDF_URL } from '@/api/client'
 import { useResume } from '@/api/queries'
-import { DownloadButton } from '@/components/DownloadButton'
+import type { ResumeResponse } from '@/api/types/ResumeResponse'
 import { PageMeta } from '@/components/PageMeta'
-import { ErrorState, PageSkeleton } from '@/components/PageState'
-import { Reveal } from '@/components/Reveal'
+import { QueryState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { externalLinkProps, formatDates } from '@/lib/format'
+import { formatDates } from '@/lib/format'
+import { DownloadButton } from './DownloadButton'
+import { ResumeEntry, ResumeSection } from './ResumeSection'
 
-export function Resume() {
-  const { data, error, isPending, refetch } = useResume()
+export function ResumePage() {
+  const resume = useResume()
+  return <QueryState query={resume}>{(data) => <Resume resume={data} />}</QueryState>
+}
 
-  if (isPending) return <PageSkeleton />
-  if (error) return <ErrorState onRetry={() => refetch()} />
-
-  const { profile, experience, education, skill_groups, awards, has_pdf } = data
+function Resume({ resume }: { resume: ResumeResponse }) {
+  const { profile, experience, education, skill_groups, awards, has_pdf } = resume
 
   return (
     <>
@@ -100,54 +100,5 @@ export function Resume() {
         )}
       </div>
     </>
-  )
-}
-
-function ResumeSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Reveal>
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-heading text-2xl text-heading">{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-8">{children}</CardContent>
-      </Card>
-    </Reveal>
-  )
-}
-
-type ResumeEntryProps = {
-  title: string
-  org: string
-  orgUrl?: string | null
-  meta: string
-  bullets: string[]
-}
-
-function ResumeEntry({ title, org, orgUrl, meta, bullets }: ResumeEntryProps) {
-  return (
-    <div>
-      <div className="flex flex-col justify-between gap-1 sm:flex-row sm:items-baseline">
-        <h3 className="text-lg">
-          {title}
-          <span className="text-muted-foreground"> · </span>
-          {orgUrl ? (
-            <a href={orgUrl} className="text-primary hover:underline" {...externalLinkProps(orgUrl)}>
-              {org}
-            </a>
-          ) : (
-            <span className="text-primary">{org}</span>
-          )}
-        </h3>
-        <p className="font-mono text-xs text-muted-foreground">{meta}</p>
-      </div>
-      {bullets.length > 0 && (
-        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-prose marker:text-gold-dim">
-          {bullets.map((bullet) => (
-            <li key={bullet}>{bullet}</li>
-          ))}
-        </ul>
-      )}
-    </div>
   )
 }
