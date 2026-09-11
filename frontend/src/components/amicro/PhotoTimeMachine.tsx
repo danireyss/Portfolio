@@ -4,8 +4,9 @@
  *
  * Changes from the original: takes photos as props and is sized for a page section instead of a
  * thumbnail; clicking the stack or pressing the arrow keys steps through it; a caption under the
- * stack; screen-reader labels; a unique SVG filter id per instance; and the site's theme tokens
- * instead of hard-coded blue/white.
+ * stack; screen-reader labels; a unique SVG filter id per instance; the site's theme tokens
+ * instead of hard-coded blue/white; and no surrounding panel, with each card taking its photo's
+ * own shape (portrait or landscape) instead of a fixed frame.
  */
 import { AnimatePresence, motion } from 'motion/react'
 import { useId, useState, type KeyboardEvent } from 'react'
@@ -84,22 +85,23 @@ export function PhotoTimeMachine({ photos, className }: PhotoTimeMachineProps) {
         </defs>
       </svg>
 
-      <div className="relative flex items-center gap-3 overflow-hidden rounded-2xl border border-border bg-card/60 p-4 sm:gap-8 sm:p-8">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,color-mix(in_oklab,var(--primary)_7%,transparent),transparent_70%)]" />
+      {/* overflow-hidden clips photos as they fly out of the stack. */}
+      <div className="relative flex items-center gap-3 overflow-hidden py-4 sm:gap-6">
 
         {/* The stack. Clicking steps forward, wrapping to the first photo. */}
         <div
-          className="relative flex aspect-[4/3] min-w-0 flex-1 cursor-pointer items-center justify-center [perspective:800px]"
+          className="relative flex h-[26rem] min-w-0 flex-1 cursor-pointer items-center justify-center [perspective:800px] sm:h-[34rem]"
           onClick={() => setActive(active === photos.length - 1 ? 0 : active + 1)}
         >
           {photos.map((photo, i) => {
             const offset = i - active
             const isPast = offset < 0
+            const loading = Math.abs(offset) > 2 ? 'lazy' : 'eager'
             return (
               <motion.div
                 key={photo.src}
                 aria-hidden={i !== active}
-                className="absolute flex aspect-[16/10] w-[82%] origin-center overflow-hidden rounded-2xl shadow-2xl shadow-black/50"
+                className="absolute max-w-[92%] origin-center overflow-hidden rounded-2xl shadow-2xl shadow-black/60"
                 initial={false}
                 animate={{
                   z: isPast ? 200 : -offset * 60,
@@ -111,13 +113,14 @@ export function PhotoTimeMachine({ photos, className }: PhotoTimeMachineProps) {
                 transition={STACK_SPRING}
                 style={{ zIndex: photos.length - i, filter: `url(#${filterId})` }}
               >
+                {/* The card shrink-wraps the photo, so portrait and landscape both show whole. */}
                 <img
                   src={photo.src}
                   alt={photo.alt}
-                  loading={Math.abs(offset) > 2 ? 'lazy' : 'eager'}
+                  loading={loading}
                   decoding="async"
                   draggable={false}
-                  className="size-full object-cover"
+                  className="block h-auto max-h-[22rem] w-auto max-w-full sm:max-h-[30rem]"
                 />
                 <div className="pointer-events-none absolute inset-0 bg-black/10" />
               </motion.div>

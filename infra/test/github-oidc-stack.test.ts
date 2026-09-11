@@ -5,7 +5,7 @@ import { GithubOidcStack } from '../lib/github-oidc-stack'
 const template = Template.fromStack(
   new GithubOidcStack(new App(), 'Test', {
     env: { account: '123456789012', region: 'us-east-1' },
-    repository: 'someone/site',
+    repository: { owner: 'someone', ownerId: 1, name: 'site', id: 2 },
     branch: 'main',
   }),
 )
@@ -26,7 +26,8 @@ test('only lets the configured repo and branch assume the deploy role', () => {
           Condition: {
             StringEquals: {
               'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
-              'token.actions.githubusercontent.com:sub': 'repo:someone/site:ref:refs/heads/main',
+              // GitHub's immutable subject: owner and repo by name and numeric ID.
+              'token.actions.githubusercontent.com:sub': 'repo:someone@1/site@2:ref:refs/heads/main',
             },
           },
         }),
