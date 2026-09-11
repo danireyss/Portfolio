@@ -1,111 +1,136 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * The template's palette (peterpinto.dev) mapped onto shadcn's semantic tokens, so shadcn and
+ * Amicro components share one theme. The site is dark-only: index.html sets class="dark" so
+ * shadcn's dark: variants apply.
+ */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --background: #0d0d0d;
+  --foreground: #e8e4dc;
+  --card: #151515;
+  --card-foreground: #e8e4dc;
+  --popover: #151515;
+  --popover-foreground: #e8e4dc;
+  --primary: #c8a96e;
+  --primary-foreground: #0d0d0d;
+  --secondary: #1c1c1c;
+  --secondary-foreground: #e8e4dc;
+  --muted: #1c1c1c;
+  --muted-foreground: #a39e95;
+  --accent: #1c1c1c;
+  --accent-foreground: #f5f2ec;
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: #2a2a2a;
+  --input: #2a2a2a;
+  --ring: #8a7248;
+  --radius: 0.375rem;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+  /* Template extras: headings, body copy, and the dimmed gold. */
+  --heading: #f5f2ec;
+  --prose: #cdc8c0;
+  --gold-dim: #8a7248;
+}
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@theme inline {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Playfair Display", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-heading: var(--heading);
+  --color-prose: var(--prose);
+  --color-gold-dim: var(--gold-dim);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* The template's centered 900px column, with side gutters. */
+@utility page {
+  width: 100%;
+  max-width: calc(900px + 3rem);
+  margin-inline: auto;
+  padding-inline: 1.5rem;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply scroll-smooth bg-background font-sans antialiased;
+    color-scheme: dark;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  h1,
+  h2,
+  h3 {
+    @apply font-heading text-heading;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--primary) 35%, transparent);
+    color: var(--heading);
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+@layer components {
+  /* Small gold mono label above section titles. */
+  .eyebrow {
+    @apply font-mono text-xs tracking-[0.2em] text-primary uppercase;
   }
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
+  /* Colors for @tailwindcss/typography, used on project write-ups. */
+  .prose-portfolio {
+    --tw-prose-body: var(--prose);
+    --tw-prose-headings: var(--heading);
+    --tw-prose-lead: var(--prose);
+    --tw-prose-links: var(--primary);
+    --tw-prose-bold: var(--heading);
+    --tw-prose-counters: var(--muted-foreground);
+    --tw-prose-bullets: var(--gold-dim);
+    --tw-prose-hr: var(--border);
+    --tw-prose-quotes: var(--foreground);
+    --tw-prose-quote-borders: var(--gold-dim);
+    --tw-prose-captions: var(--muted-foreground);
+    --tw-prose-code: var(--heading);
+    --tw-prose-pre-code: var(--foreground);
+    --tw-prose-pre-bg: var(--card);
+    --tw-prose-th-borders: var(--border);
+    --tw-prose-td-borders: var(--border);
   }
-}
-
-#root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-}
-
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
-}
-
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
 }
