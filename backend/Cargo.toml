@@ -1,0 +1,26 @@
+[package]
+name = "portfolio-api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+async-trait = "0.1.92"
+aws-config = { version = "1.12.0", features = ["behavior-version-latest"] }
+aws-sdk-sesv2 = "1.133.0"
+axum = "0.8.9"
+include_dir = "0.7.4"
+lambda_http = "1.3.1"
+pulldown-cmark = "0.13.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.20"
+tokio = { version = "1.53.1", features = ["full"] }
+toml = "1.1.6"
+tower-http = { version = "0.7.1", features = ["trace"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
+ts-rs = "12.0.1"
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tower = { version = "0.5.3", features = ["util"] }
