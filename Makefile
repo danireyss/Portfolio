@@ -1,10 +1,23 @@
-.PHONY: dev backend frontend test build build-frontend build-backend synth deploy deploy-github-role upload-photos
+.PHONY: dev dev-otel backend frontend test build build-frontend build-backend synth deploy deploy-github-role upload-photos
 
 # Run the Axum API (:3000) and the Vite dev server (:5173) together.
 dev:
 	@trap 'kill 0' EXIT; \
 	(cd backend && cargo run) & \
 	(cd frontend && npm run dev) & \
+	wait
+
+# Like `dev`, but also exporting traces, metrics, and logs over OTLP/HTTP to the local Grafana
+# stack in ../telemetry (start it there first with `docker compose up -d`). Grafana takes :3000,
+# so the API runs on :3001 and Vite's proxy follows it.
+dev-otel:
+	@trap 'kill 0' EXIT; \
+	(cd backend && PORT=3001 \
+		OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+		OTEL_SERVICE_NAME=portfolio-api \
+		OTEL_RESOURCE_ATTRIBUTES=service.namespace=portfolio,deployment.environment=local \
+		cargo run) & \
+	(cd frontend && API_PORT=3001 npm run dev) & \
 	wait
 
 backend:

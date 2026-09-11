@@ -48,6 +48,7 @@ impl S3PhotoStore {
 
 #[async_trait]
 impl PhotoStore for S3PhotoStore {
+    #[tracing::instrument(name = "photos.list", skip(self), fields(store = "s3"), err)]
     async fn list(&self, folder: &str) -> Result<Vec<String>, PhotoStoreError> {
         let prefix = format!("photos/{folder}/");
         let mut pages = self
@@ -88,6 +89,7 @@ impl LocalPhotoStore {
 
 #[async_trait]
 impl PhotoStore for LocalPhotoStore {
+    #[tracing::instrument(name = "photos.list", skip(self), fields(store = "local"), err)]
     async fn list(&self, folder: &str) -> Result<Vec<String>, PhotoStoreError> {
         let dir = self.root.join(folder);
         let error = |e: std::io::Error| PhotoStoreError(format!("{}: {e}", dir.display()));
