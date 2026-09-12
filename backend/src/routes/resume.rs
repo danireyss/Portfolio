@@ -23,7 +23,7 @@ pub struct ResumeResponse<'a> {
 }
 
 pub(crate) async fn resume(State(state): State<AppState>) -> Response {
-    let content = &state.content;
+    let content = state.content.get();
     Json(ResumeResponse {
         profile: content.profile(),
         socials: content.socials(),
@@ -46,11 +46,11 @@ pub(crate) async fn pdf(
     State(state): State<AppState>,
     Query(query): Query<PdfQuery>,
 ) -> Result<Response, AppError> {
-    let pdf = state.content.resume_pdf().ok_or(AppError::NotFound)?;
+    let content = state.content.get();
+    let pdf = content.resume_pdf().ok_or(AppError::NotFound)?.clone();
 
     // "Daniel Reyes" -> "Daniel-Reyes-Resume.pdf"; ASCII-only so it's a valid header value.
-    let name: String = state
-        .content
+    let name: String = content
         .profile()
         .name
         .chars()

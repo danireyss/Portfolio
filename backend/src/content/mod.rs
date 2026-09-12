@@ -1,18 +1,25 @@
-//! Site content: `content/site.toml` and `content/projects/*.md`, embedded into the binary at
-//! compile time so the Lambda needs no filesystem, bucket, or database to serve it.
+//! Site content: `content/site.toml`, `content/projects/*.md`, and `content/resume.pdf`. At
+//! runtime it comes from a [`ContentStore`] (see `store.rs`); the copy embedded into the binary
+//! at compile time is the fallback when there's no store or it's still empty.
 
 mod model;
+mod store;
 
 pub use model::{
     About, Award, Education, Experience, FocusArea, Gallery, GalleryConfig, Link, Photo,
     PhotoDetails, Profile, Project, ProjectRef, ProjectSummary, SkillGroup, Social, SocialKind,
     Tag,
 };
+pub use store::{
+    ContentHandle, ContentSources, ContentStore, ContentStoreError, LoadError, LocalContentStore,
+    S3ContentStore,
+};
 
 use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::path::Path;
 
+use bytes::Bytes;
 use include_dir::{Dir, File, include_dir};
 use model::{FrontMatter, SiteFile};
 use pulldown_cmark::{Options, Parser, html};
@@ -45,7 +52,7 @@ pub struct Content {
     /// Sorted by front matter `order`, then title.
     projects: Vec<Project>,
     tags: Vec<Tag>,
-    resume_pdf: Option<&'static [u8]>,
+    resume_pdf: Option<Bytes>,
 }
 
 impl Content {
@@ -64,7 +71,9 @@ impl Content {
             }
         }
 
-        let resume_pdf = CONTENT_DIR.get_file("resume.pdf").map(File::contents);
+        let resume_pdf = CONTENT_DIR
+            .get_file("resume.pdf")
+            .map(|file| Bytes::from_static(file.contents()));
         Self::from_sources(utf8(site)?, &project_files, resume_pdf)
     }
 
@@ -72,7 +81,7 @@ impl Content {
     pub fn from_sources(
         site_toml: &str,
         project_files: &[(String, &str)],
-        resume_pdf: Option<&'static [u8]>,
+        resume_pdf: Option<Bytes>,
     ) -> Result<Self, ContentError> {
         let site: SiteFile = toml::from_str(site_toml).map_err(|source| ContentError::Toml {
             file: "site.toml".into(),
@@ -156,8 +165,8 @@ impl Content {
         &self.tags
     }
 
-    pub fn resume_pdf(&self) -> Option<&'static [u8]> {
-        self.resume_pdf
+    pub fn resume_pdf(&self) -> Option<&Bytes> {
+        self.resume_pdf.as_ref()
     }
 }
 

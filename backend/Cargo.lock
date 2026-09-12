@@ -2294,6 +2294,7 @@ dependencies = [
  "aws-sdk-s3",
  "aws-sdk-sesv2",
  "axum",
+ "bytes",
  "futures",
  "http-body-util",
  "include_dir",

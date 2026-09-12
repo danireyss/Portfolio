@@ -19,7 +19,8 @@ pub(crate) async fn photos(
     State(state): State<AppState>,
 ) -> Result<Json<PhotosResponse>, AppError> {
     // List every gallery folder at once rather than one after another.
-    let configs = state.content.galleries();
+    let content = state.content.get();
+    let configs = content.galleries();
     let listings = try_join_all(
         configs
             .iter()

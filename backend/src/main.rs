@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use portfolio_api::content::Content;
+use portfolio_api::content::{Content, ContentHandle, LocalContentStore, S3ContentStore};
 use portfolio_api::email::{LogMailer, Mailer, SesMailer};
 use portfolio_api::photos::{CachedPhotoStore, LocalPhotoStore, PhotoStore, S3PhotoStore};
 use portfolio_api::telemetry::Telemetry;
@@ -31,7 +31,7 @@ fn main() -> Result<(), Error> {
 }
 
 async fn run(on_lambda: bool) -> Result<(), Error> {
-    let content = Arc::new(Content::load_embedded()?);
+    let content = Arc::new(load_content(on_lambda).await?);
     let mailer: Arc<dyn Mailer> = match SesMailer::from_env().await? {
         Some(ses) => Arc::new(ses),
         None => {
@@ -70,6 +70,21 @@ async fn run(on_lambda: bool) -> Result<(), Error> {
         .with_graceful_shutdown(shutdown_signal())
         .await?;
     Ok(())
+}
+
+/// `content/` in the S3 bucket named by `CONTENT_BUCKET` when it's set. Otherwise the copy built
+/// into the binary on Lambda, and locally the repo's content/ folder, re-read when files change.
+async fn load_content(on_lambda: bool) -> Result<ContentHandle, Error> {
+    if let Some(s3) = S3ContentStore::from_env().await {
+        // Other instances' saves show up within this interval.
+        return Ok(ContentHandle::from_store(Arc::new(s3), Duration::from_secs(15)).await?);
+    }
+    if on_lambda {
+        return Ok(ContentHandle::fixed(Content::load_embedded()?));
+    }
+    let local = LocalContentStore::from_env();
+    tracing::info!(dir = %local.root().display(), "reading content from a local folder");
+    Ok(ContentHandle::from_store(Arc::new(local), Duration::from_secs(1)).await?)
 }
 
 /// Resolves on Ctrl+C or SIGTERM (`make dev` stops with either), so pending telemetry is

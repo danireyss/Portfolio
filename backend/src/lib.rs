@@ -10,13 +10,14 @@ use std::sync::Arc;
 use axum::Router;
 use tower_http::trace::TraceLayer;
 
-use content::Content;
+use content::ContentHandle;
 use email::Mailer;
 use photos::PhotoStore;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub content: Arc<Content>,
+    /// `content.get()` for the current content, which a newer version can replace at any time.
+    pub content: Arc<ContentHandle>,
     pub mailer: Arc<dyn Mailer>,
     pub photos: Arc<dyn PhotoStore>,
 }
