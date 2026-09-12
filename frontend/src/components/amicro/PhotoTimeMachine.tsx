@@ -101,7 +101,7 @@ export function PhotoTimeMachine({ photos, className }: PhotoTimeMachineProps) {
               <motion.div
                 key={photo.src}
                 aria-hidden={i !== active}
-                className="absolute max-w-[92%] origin-center overflow-hidden rounded-2xl shadow-2xl shadow-black/60"
+                className="absolute max-w-[92%] origin-center overflow-hidden rounded-2xl shadow-2xl shadow-black/25 dark:shadow-black/60"
                 initial={false}
                 animate={{
                   z: isPast ? 200 : -offset * 60,
