@@ -45,8 +45,15 @@ export function Nav() {
           <NavigationMenuList>
             {links.map(({ to, label }) => (
               <NavigationMenuItem key={to}>
+                {/* The underline alone marks the current page. Radix sets data-active="" (so
+                    data-active:, not data-[active=true]:), and shadcn's grey box is cleared for
+                    focus too: a clicked link keeps focus, and the box would fade back in every
+                    time the browser tab regains focus. Keyboard focus still gets the ring. */}
                 <NavigationMenuLink asChild active={isActive(to)}>
-                  <Link to={to} className="relative bg-transparent hover:bg-transparent data-[active=true]:bg-transparent data-[active=true]:text-primary">
+                  <Link
+                    to={to}
+                    className="relative bg-transparent hover:bg-transparent focus:bg-transparent data-active:bg-transparent data-active:text-primary data-active:hover:bg-transparent data-active:focus:bg-transparent"
+                  >
                     {label}
                     {isActive(to) && (
                       <motion.span
