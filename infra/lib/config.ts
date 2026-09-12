@@ -9,6 +9,17 @@ export const config = {
    * verify it, so click the link in the email AWS sends.
    */
   contactEmail: 'danieljreyes2001@gmail.com',
+  /** Editing the site's content at /admin. */
+  admin: {
+    /** The only Google account allowed in. */
+    email: 'danieljreyes2001@gmail.com',
+    /**
+     * Where the auth service's secrets live in SSM Parameter Store, as SecureStrings:
+     * google-client-id, google-client-secret, and better-auth-secret. `make auth-secrets`
+     * creates them (the secrets themselves never go in git).
+     */
+    secretsPrefix: '/portfolio/auth',
+  },
   /**
    * Only pushes to this repo and branch may assume the GitHub Actions deploy role. The repo uses
    * GitHub's immutable OIDC subjects, which identify the owner and repo by numeric ID as well as

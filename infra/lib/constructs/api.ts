@@ -74,4 +74,17 @@ export class Api extends Construct {
     // "https://abc123.execute-api.us-east-1.amazonaws.com" -> "abc123.execute-api.us-east-1.amazonaws.com"
     this.originDomain = Fn.select(2, Fn.split('/', this.httpApi.apiEndpoint))
   }
+
+  /**
+   * Sends sign-in (/api/auth/*) to the Better Auth service, and tells the API where to ask it
+   * who's signed in (`AUTH_URL`).
+   */
+  addAuth(authHandler: lambda.IFunction) {
+    this.httpApi.addRoutes({
+      path: '/api/auth/{proxy+}',
+      methods: [apigwv2.HttpMethod.ANY],
+      integration: new HttpLambdaIntegration('AuthIntegration', authHandler),
+    })
+    this.handler.addEnvironment('AUTH_URL', this.httpApi.apiEndpoint)
+  }
 }

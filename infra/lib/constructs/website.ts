@@ -13,7 +13,7 @@ export interface WebsiteProps {
   readonly assetPath: string
   /** Hostname that serves /api/* (the HTTP API). */
   readonly apiOriginDomain: string
-  /** Bucket that serves /photos/*. */
+  /** Bucket that serves /photos/* and /uploads/*. */
   readonly mediaBucket: s3.IBucket
   /** Custom domain; without one the site uses its *.cloudfront.net address. */
   readonly domain?: SiteDomain
@@ -21,10 +21,11 @@ export interface WebsiteProps {
 
 /**
  * The built React app in a private bucket behind CloudFront, which also fronts the API and the
- * photos:
- * - `/api/*`    -> the API origin
- * - `/photos/*` -> the media bucket
- * - everything else -> the site bucket
+ * media bucket:
+ * - `/api/auth/*`, `/api/admin/*` -> the API origin, never cached (sign-in and admin)
+ * - `/api/*`                      -> the API origin, cached for a few minutes
+ * - `/photos/*`, `/uploads/*`     -> the media bucket
+ * - everything else               -> the site bucket
  */
 export class Website extends Construct {
   readonly distribution: cloudfront.Distribution
@@ -62,6 +63,23 @@ export class Website extends Construct {
     })
 
     const securityHeaders = cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS
+    const api = new origins.HttpOrigin(props.apiOriginDomain)
+    const media = origins.S3BucketOrigin.withOriginAccessControl(props.mediaBucket)
+    // Sign-in and admin: never cached, with every cookie and header passed through.
+    const uncachedApi: cloudfront.BehaviorOptions = {
+      origin: api,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
+      allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
+      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      responseHeadersPolicy: securityHeaders,
+    }
+    const mediaFiles: cloudfront.BehaviorOptions = {
+      origin: media,
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      responseHeadersPolicy: securityHeaders,
+    }
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: 'Portfolio site',
       domainNames: props.domain?.names,
@@ -79,9 +97,12 @@ export class Website extends Construct {
           { function: viewerRequest, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
         ],
       },
+      // CloudFront uses the first pattern that matches, so the uncached /api paths come first.
       additionalBehaviors: {
+        '/api/auth/*': uncachedApi,
+        '/api/admin/*': uncachedApi,
         '/api/*': {
-          origin: new origins.HttpOrigin(props.apiOriginDomain),
+          origin: api,
           viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
           cachePolicy: apiCachePolicy,
@@ -89,12 +110,9 @@ export class Website extends Construct {
           originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
           responseHeadersPolicy: securityHeaders,
         },
-        '/photos/*': {
-          origin: origins.S3BucketOrigin.withOriginAccessControl(props.mediaBucket),
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
-          responseHeadersPolicy: securityHeaders,
-        },
+        '/photos/*': mediaFiles,
+        // Headshots uploaded through admin.
+        '/uploads/*': mediaFiles,
       },
     })
     this.url = `https://${props.domain?.names[0] ?? this.distribution.distributionDomainName}`

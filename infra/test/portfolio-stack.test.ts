@@ -1,16 +1,16 @@
-import { App } from 'aws-cdk-lib'
 import { Match, Template } from 'aws-cdk-lib/assertions'
 import { PortfolioStack, type PortfolioStackProps } from '../lib/portfolio-stack'
-import { env, fakeBuilds } from './helpers'
+import { authProjectRoot, env, fakeBuilds, testApp } from './helpers'
 
 // The constructs have their own tests; these check how the stack wires them together.
 
 function synth(overrides: Partial<PortfolioStackProps> = {}) {
-  const stack = new PortfolioStack(new App(), 'Test', {
+  const stack = new PortfolioStack(testApp(), 'Test', {
     env,
     domain: { name: 'example.dev', hostedZoneId: 'Z123' },
     contactEmail: 'me@example.com',
     ...fakeBuilds(),
+    admin: { email: 'admin@example.com', secretsPrefix: '/test/auth', authProjectRoot },
     ...overrides,
   })
   return Template.fromStack(stack)
@@ -32,6 +32,51 @@ test('gives the API the media bucket name and lets it list photos/', () => {
           Condition: { StringLike: { 's3:prefix': 'photos/*' } },
         }),
       ]),
+    },
+  })
+})
+
+test('runs the auth service for the site and routes sign-in to it', () => {
+  template.hasResourceProperties('AWS::Lambda::Function', {
+    Runtime: 'nodejs24.x',
+    Environment: {
+      Variables: Match.objectLike({
+        BETTER_AUTH_URL: 'https://example.dev',
+        ADMIN_EMAIL: 'admin@example.com',
+        SSM_PREFIX: '/test/auth',
+      }),
+    },
+  })
+  template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+    RouteKey: 'ANY /api/auth/{proxy+}',
+  })
+})
+
+test('gives the API what admin needs', () => {
+  template.hasResourceProperties('AWS::Lambda::Function', {
+    Handler: 'bootstrap',
+    Environment: {
+      Variables: Match.objectLike({
+        CONTENT_BUCKET: { Ref: Match.stringLikeRegexp('^MediaBucket') },
+        ADMIN_EMAIL: 'admin@example.com',
+        ADMIN_ORIGINS: 'https://example.dev',
+        DISTRIBUTION_ID: { Ref: Match.stringLikeRegexp('^WebsiteDistribution') },
+        AUTH_URL: Match.anyValue(),
+      }),
+    },
+  })
+  const policies = JSON.stringify(template.findResources('AWS::IAM::Policy'))
+  for (const expected of ['cloudfront:CreateInvalidation', '/content/*', '/uploads/*', '/photos/*']) {
+    expect(policies).toContain(expected)
+  }
+})
+
+test('lets the site upload straight to the media bucket', () => {
+  template.hasResourceProperties('AWS::S3::Bucket', {
+    CorsConfiguration: {
+      CorsRules: [
+        Match.objectLike({ AllowedMethods: ['PUT'], AllowedOrigins: ['https://example.dev'] }),
+      ],
     },
   })
 })
