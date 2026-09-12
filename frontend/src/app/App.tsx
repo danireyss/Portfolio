@@ -1,28 +1,19 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { lazy, useEffect, type ComponentType } from 'react'
+import { useEffect } from 'react'
 import { Route, Routes } from 'react-router'
 import { prefetchPageData } from '@/api/queries'
 import { NotFound } from '@/components/NotFound'
 import { HomePage } from '@/features/home/HomePage'
 import { Layout } from './layout/Layout'
-import { pageModules, preloadPages } from './pages'
+import { adminPage, pages, preloadPages } from './pages'
 
-/** Code-splits a page: its JavaScript is fetched on first visit, or earlier by preloadPages. */
-function lazyPage<M extends Record<K, ComponentType>, K extends string>(
-  load: () => Promise<M>,
-  name: K,
-) {
-  return lazy(async () => ({ default: (await load())[name] }))
-}
-
-// The landing page ships in the main bundle; everything else loads separately.
-const ProjectsPage = lazyPage(pageModules.projects, 'ProjectsPage')
-const ProjectDetailPage = lazyPage(pageModules.project, 'ProjectDetailPage')
-const PhotosPage = lazyPage(pageModules.photos, 'PhotosPage')
-const ResumePage = lazyPage(pageModules.resume, 'ResumePage')
-const ContactPage = lazyPage(pageModules.contact, 'ContactPage')
-// Not preloaded: only the owner ever opens it.
-const AdminPage = lazyPage(() => import('@/features/admin/AdminPage'), 'AdminPage')
+// The landing page ships in the main bundle; everything else loads separately (see pages.ts).
+const ProjectsPage = pages.projects.Page
+const ProjectDetailPage = pages.project.Page
+const PhotosPage = pages.photos.Page
+const ResumePage = pages.resume.Page
+const ContactPage = pages.contact.Page
+const AdminPage = adminPage.Page
 
 /**
  * Once the first page has loaded and the browser is idle, fetches every other page's code and

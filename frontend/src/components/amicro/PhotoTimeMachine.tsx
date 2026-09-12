@@ -11,6 +11,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useId, useState, type KeyboardEvent } from 'react'
 import type { Photo } from '@/api/types/Photo'
+import { STACK_DEPTH } from '@/lib/photos'
 import { cn } from '@/lib/utils'
 
 // The original's springs and 3D offsets; vertical steps are a percentage of the photo height.
@@ -96,7 +97,7 @@ export function PhotoTimeMachine({ photos, className }: PhotoTimeMachineProps) {
           {photos.map((photo, i) => {
             const offset = i - active
             const isPast = offset < 0
-            const loading = Math.abs(offset) > 2 ? 'lazy' : 'eager'
+            const loading = Math.abs(offset) < STACK_DEPTH ? 'eager' : 'lazy'
             return (
               <motion.div
                 key={photo.src}

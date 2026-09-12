@@ -6,6 +6,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { useCallback } from 'react'
+import { preloadStackPhotos } from '@/lib/photos'
 import { api, isNotFound } from './client'
 import type { PhotosResponse } from './types/PhotosResponse'
 import type { SiteResponse } from './types/SiteResponse'
@@ -74,7 +75,8 @@ export function prefetchPageData(queryClient: QueryClient, path: string) {
     const slug = decodeURIComponent(path.slice('/projects/'.length))
     void queryClient.prefetchQuery(queries.project(slug))
   } else if (path === '/photos') {
-    void queryClient.prefetchQuery(queries.photos())
+    // Its data is usually cached already; the photos themselves are what the page waits on.
+    void queryClient.fetchQuery(queries.photos()).then(preloadStackPhotos, () => {})
   } else if (path === '/resume') {
     void queryClient.prefetchQuery(queries.resume())
   }
