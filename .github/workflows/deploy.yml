@@ -34,6 +34,7 @@ jobs:
           cache: npm
           cache-dependency-path: |
             frontend/package-lock.json
+            auth/package-lock.json
             infra/package-lock.json
 
       - uses: dtolnay/rust-toolchain@stable
@@ -55,6 +56,11 @@ jobs:
       - name: Build backend for Lambda (arm64)
         working-directory: backend
         run: cargo lambda build --release --arm64
+
+      # CDK bundles the auth service with esbuild during synth, from its node_modules.
+      - name: Install auth service dependencies
+        working-directory: auth
+        run: npm ci
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:

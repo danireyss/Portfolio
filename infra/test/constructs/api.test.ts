@@ -1,4 +1,5 @@
 import { Match, Template } from 'aws-cdk-lib/assertions'
+import * as lambda from 'aws-cdk-lib/aws-lambda'
 import { Api } from '../../lib/constructs/api'
 import { fakeBuilds, testStack } from '../helpers'
 
@@ -34,6 +35,29 @@ test('verifies the contact address in SES and may send email as it', () => {
         Match.objectLike({ Action: Match.arrayWith(['ses:SendEmail']) }),
       ]),
     },
+  })
+})
+
+test('addAuth routes /api/auth/* to the auth service and tells the API where it is', () => {
+  const authStack = testStack()
+  const api = new Api(authStack, 'Api', {
+    codePath: fakeBuilds().lambdaCodePath,
+    contactEmail: 'me@example.com',
+  })
+  api.addAuth(
+    new lambda.Function(authStack, 'Auth', {
+      runtime: lambda.Runtime.NODEJS_24_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromInline('exports.handler = async () => {}'),
+    }),
+  )
+  const authTemplate = Template.fromStack(authStack)
+  authTemplate.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+    RouteKey: 'ANY /api/auth/{proxy+}',
+  })
+  authTemplate.hasResourceProperties('AWS::Lambda::Function', {
+    Handler: 'bootstrap',
+    Environment: { Variables: Match.objectLike({ AUTH_URL: Match.anyValue() }) },
   })
 })
 

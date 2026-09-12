@@ -1,10 +1,16 @@
 import type { About } from '@/api/types/About'
+import { AdminEdit } from '@/components/AdminEdit'
 import { Reveal } from '@/components/Reveal'
 import { Section } from '@/components/Section'
 
 export function AboutSection({ about }: { about: About }) {
   return (
-    <Section id="about" eyebrow="About" title="Background & focus">
+    <Section
+      id="about"
+      eyebrow="About"
+      title="Background & focus"
+      action={<AdminEdit section="about" />}
+    >
       <div className="grid gap-10 md:grid-cols-[3fr_2fr]">
         <Reveal className="space-y-4 leading-relaxed text-prose">
           {about.background.map((paragraph) => (

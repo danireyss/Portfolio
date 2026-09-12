@@ -3,12 +3,22 @@ import { Reveal } from '@/components/Reveal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { externalLinkProps } from '@/lib/format'
 
-export function ResumeSection({ title, children }: { title: string; children: ReactNode }) {
+type ResumeSectionProps = {
+  title: string
+  /** Shown beside the title, e.g. admin's edit button. */
+  action?: ReactNode
+  children: ReactNode
+}
+
+export function ResumeSection({ title, action, children }: ResumeSectionProps) {
   return (
     <Reveal>
       <Card>
         <CardHeader>
-          <CardTitle className="font-heading text-2xl text-heading">{title}</CardTitle>
+          <div className="flex items-center gap-3">
+            <CardTitle className="font-heading text-2xl text-heading">{title}</CardTitle>
+            {action}
+          </div>
         </CardHeader>
         <CardContent className="space-y-8">{children}</CardContent>
       </Card>

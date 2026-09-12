@@ -32,6 +32,19 @@ test('routes /api/* to the API and /photos/* to the media bucket', () => {
   })
 })
 
+test('never caches sign-in or admin, and matches them before the cached /api/*', () => {
+  const [distribution] = Object.values(template.findResources('AWS::CloudFront::Distribution'))
+  const behaviors: { PathPattern: string; CachePolicyId: string }[] =
+    distribution.Properties.DistributionConfig.CacheBehaviors
+  const patterns = behaviors.map((behavior) => behavior.PathPattern)
+  const cachingDisabled = '4135ea2d-6df8-44a3-9df3-4b5a84be39ad'
+  for (const pattern of ['/api/auth/*', '/api/admin/*']) {
+    expect(patterns.indexOf(pattern)).toBeLessThan(patterns.indexOf('/api/*'))
+    expect(behaviors.find((b) => b.PathPattern === pattern)?.CachePolicyId).toBe(cachingDisabled)
+  }
+  expect(patterns).toContain('/uploads/*')
+})
+
 test('runs the viewer-request function on the site', () => {
   template.hasResourceProperties('AWS::CloudFront::Function', {
     FunctionConfig: Match.objectLike({ Runtime: 'cloudfront-js-2.0' }),

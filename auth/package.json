@@ -1,0 +1,26 @@
+{
+  "name": "portfolio-auth",
+  "private": true,
+  "description": "Google sign-in for the site's admin (Better Auth on Hono): a Lambda in production, a local server for make dev",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/dev.ts",
+    "lint": "oxlint",
+    "typecheck": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "better-auth": "^1.7.4",
+    "hono": "^4.13.7"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-ssm": "^3.1131.0",
+    "@types/aws-lambda": "^8.10.163",
+    "@types/node": "^24.13.4",
+    "oxlint": "^1.81.0",
+    "tsx": "^4.23.13",
+    "typescript": "~6.0.2",
+    "vitest": "^5.0.0"
+  }
+}

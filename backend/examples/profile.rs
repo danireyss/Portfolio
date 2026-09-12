@@ -21,7 +21,7 @@ use axum::Router;
 use axum::body::Body;
 use axum::http::Request;
 use http_body_util::BodyExt;
-use portfolio_api::content::Content;
+use portfolio_api::content::{Content, ContentHandle};
 use portfolio_api::email::LogMailer;
 use portfolio_api::photos::{CachedPhotoStore, LocalPhotoStore};
 use portfolio_api::telemetry::Telemetry;
@@ -110,9 +110,10 @@ async fn main() -> Result<(), Error> {
         Duration::from_secs(3600),
     );
     let router = app(AppState {
-        content: Arc::new(content),
+        content: Arc::new(ContentHandle::fixed(content)),
         mailer: Arc::new(LogMailer),
         photos: Arc::new(photos),
+        admin: None,
     });
     // Fill the photo cache and lazy statics first, as on a warm Lambda instance.
     for path in ENDPOINTS {

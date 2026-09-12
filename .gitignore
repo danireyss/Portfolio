@@ -4,12 +4,16 @@ backend/target/
 infra/cdk.out/
 .env
 .env.*
+!.env.example
 *.local
 .DS_Store
 
 # Gallery photos live in the S3 media bucket, not git. This local copy is served by `make dev`
 # and uploaded with `make upload-photos`.
 frontend/public/photos/
+
+# Headshots uploaded through admin during `make dev`; in production they're in the media bucket.
+frontend/public/uploads/
 
 # Benchmark output from scripts/bench.sh.
 bench/results/

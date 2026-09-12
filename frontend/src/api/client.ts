@@ -24,8 +24,24 @@ export class ApiError extends Error {
 export const isNotFound = (error: unknown) =>
   error instanceof ApiError && error.status === 404
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`/api${path}`, {
+/** Set by admin mode after a save: reads then ask for at least that content version. */
+let contentVersion: string | undefined
+
+/**
+ * Makes every read ask for at least `version` (`?v=`), which skips CloudFront's cached copy and
+ * has the API check for newer content first; `undefined` goes back to plain reads.
+ */
+export function setContentVersion(version: string | undefined) {
+  contentVersion = version
+}
+
+export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const isRead = (init?.method ?? 'GET') === 'GET'
+  const url =
+    contentVersion && isRead
+      ? `/api${path}${path.includes('?') ? '&' : '?'}v=${encodeURIComponent(contentVersion)}`
+      : `/api${path}`
+  const response = await fetch(url, {
     ...init,
     headers: { Accept: 'application/json', ...init?.headers },
   })

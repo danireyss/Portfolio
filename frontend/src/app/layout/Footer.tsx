@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import { useSite } from '@/api/queries'
+import { AdminEdit } from '@/components/AdminEdit'
 import { SocialLinks } from '@/components/SocialLinks'
 import { Button } from '@/components/ui/button'
 
@@ -24,7 +25,10 @@ export function Footer() {
           <p>
             © {new Date().getFullYear()} {data?.profile.name}. Built with React, Rust &amp; Axum on AWS.
           </p>
-          <SocialLinks socials={data?.socials ?? []} className="-mr-2" />
+          <div className="flex items-center gap-2">
+            <SocialLinks socials={data?.socials ?? []} className="-mr-2" />
+            <AdminEdit section="socials" />
+          </div>
         </div>
       </div>
     </footer>

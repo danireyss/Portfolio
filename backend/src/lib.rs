@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod content;
 pub mod email;
 mod error;
@@ -10,21 +11,28 @@ use std::sync::Arc;
 use axum::Router;
 use tower_http::trace::TraceLayer;
 
-use content::Content;
+use content::ContentHandle;
 use email::Mailer;
 use photos::PhotoStore;
 
 #[derive(Clone)]
 pub struct AppState {
-    pub content: Arc<Content>,
+    /// `content.get()` for the current content, which a newer version can replace at any time.
+    pub content: Arc<ContentHandle>,
     pub mailer: Arc<dyn Mailer>,
     pub photos: Arc<dyn PhotoStore>,
+    /// Owner-only editing; `None` turns every /api/admin route into a 404.
+    pub admin: Option<Arc<admin::Admin>>,
 }
 
 /// The whole API, served under `/api` both locally and behind CloudFront.
 pub fn app(state: AppState) -> Router {
+    let api = routes::router().layer(axum::middleware::from_fn_with_state(
+        state.clone(),
+        routes::fresh_content,
+    ));
     Router::new()
-        .nest("/api", routes::router())
+        .nest("/api", api)
         .with_state(state)
         // Router::layer wraps each route, so both see the matched route template.
         .layer(axum::middleware::from_fn(telemetry::track_request))

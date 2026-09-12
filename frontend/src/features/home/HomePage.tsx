@@ -1,5 +1,6 @@
 import { useProjects, useSite } from '@/api/queries'
 import type { ProjectSummary } from '@/api/types/ProjectSummary'
+import { AdminEdit } from '@/components/AdminEdit'
 import { PageMeta } from '@/components/PageMeta'
 import { QueryState } from '@/components/QueryState'
 import { Reveal } from '@/components/Reveal'
@@ -36,13 +37,23 @@ export function HomePage() {
             )}
 
             {current_role && (
-              <Section id="current-role" eyebrow="Now" title="Current role">
+              <Section
+                id="current-role"
+                eyebrow="Now"
+                title="Current role"
+                action={<AdminEdit section="experience" />}
+              >
                 <CurrentRole role={current_role} />
               </Section>
             )}
 
             {showcase.length > 0 && (
-              <Section id="featured" eyebrow="Selected work" title="Featured projects">
+              <Section
+                id="featured"
+                eyebrow="Selected work"
+                title="Featured projects"
+                action={<AdminEdit section="projects" />}
+              >
                 <FeaturedProjects projects={showcase} />
               </Section>
             )}

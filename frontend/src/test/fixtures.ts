@@ -68,14 +68,15 @@ export const alphaDetail: Project = { ...alpha, body_html: '<h2>How it works</h2
 export const photosResponse: PhotosResponse = {
   galleries: [
     {
+      folder: 'summer',
       title: 'Summer internship',
       description: null,
       photos: [
-        { src: '/photos/one.jpg', alt: 'Team standup', caption: 'Day one', date: 'Jun 2026' },
-        { src: '/photos/two.jpg', alt: 'Whiteboard session', caption: null, date: 'Jul 2026' },
+        { src: '/photos/summer/one.jpg', alt: 'Team standup', caption: 'Day one', date: 'Jun 2026' },
+        { src: '/photos/summer/two.jpg', alt: 'Whiteboard session', caption: null, date: 'Jul 2026' },
       ],
     },
     // A gallery whose folder is still empty; the page should skip it.
-    { title: 'Empty', description: null, photos: [] },
+    { folder: 'empty', title: 'Empty', description: null, photos: [] },
   ],
 }

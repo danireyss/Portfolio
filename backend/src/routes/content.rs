@@ -38,7 +38,7 @@ pub(crate) struct ProjectsQuery {
 // serialized before the handler returns.
 
 pub(crate) async fn site(State(state): State<AppState>) -> Response {
-    let content = &state.content;
+    let content = state.content.get();
     Json(SiteResponse {
         profile: content.profile(),
         about: content.about(),
@@ -53,8 +53,8 @@ pub(crate) async fn projects(
     State(state): State<AppState>,
     Query(query): Query<ProjectsQuery>,
 ) -> Response {
-    let projects = state
-        .content
+    let content = state.content.get();
+    let projects = content
         .projects()
         .iter()
         .map(|project| &project.summary)
@@ -69,7 +69,7 @@ pub(crate) async fn projects(
         .collect();
     Json(ProjectsResponse {
         projects,
-        tags: state.content.tags(),
+        tags: content.tags(),
     })
     .into_response()
 }
@@ -78,6 +78,7 @@ pub(crate) async fn project(
     State(state): State<AppState>,
     Path(slug): Path<String>,
 ) -> Result<Response, AppError> {
-    let project = state.content.project(&slug).ok_or(AppError::NotFound)?;
+    let content = state.content.get();
+    let project = content.project(&slug).ok_or(AppError::NotFound)?;
     Ok(Json(project).into_response())
 }

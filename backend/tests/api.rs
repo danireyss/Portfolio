@@ -8,7 +8,7 @@ use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::http::{HeaderMap, Request, StatusCode, header};
 use http_body_util::BodyExt;
-use portfolio_api::content::Content;
+use portfolio_api::content::{Content, ContentHandle};
 use portfolio_api::email::{ContactMessage, MailError, Mailer};
 use portfolio_api::photos::{PhotoStore, PhotoStoreError};
 use portfolio_api::{AppState, app};
@@ -103,12 +103,13 @@ impl TestApp {
             ("projects/alpha.md".to_owned(), ALPHA),
             ("projects/beta.md".to_owned(), BETA),
         ];
-        let content = Content::from_sources(SITE, &projects, pdf).unwrap();
+        let content = Content::from_sources(SITE, &projects, pdf.map(Bytes::from_static)).unwrap();
         let mailer = Arc::new(mailer);
         let router = app(AppState {
-            content: Arc::new(content),
+            content: Arc::new(ContentHandle::fixed(content)),
             mailer: mailer.clone(),
             photos: Arc::new(photos),
+            admin: None,
         });
         Self { router, mailer }
     }

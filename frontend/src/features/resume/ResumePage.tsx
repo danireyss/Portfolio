@@ -3,9 +3,11 @@ import { Fragment } from 'react'
 import { RESUME_PDF_URL } from '@/api/client'
 import { useResume } from '@/api/queries'
 import type { ResumeResponse } from '@/api/types/ResumeResponse'
+import { AdminEdit } from '@/components/AdminEdit'
 import { PageMeta } from '@/components/PageMeta'
 import { QueryState } from '@/components/QueryState'
 import { Button } from '@/components/ui/button'
+import { useAdminMode } from '@/lib/adminMode'
 import { formatDates } from '@/lib/format'
 import { DownloadButton } from './DownloadButton'
 import { ResumeEntry, ResumeSection } from './ResumeSection'
@@ -17,6 +19,9 @@ export function ResumePage() {
 
 function Resume({ resume }: { resume: ResumeResponse }) {
   const { profile, experience, education, skill_groups, awards, has_pdf } = resume
+  // In admin mode empty sections still show, so there's an edit button to add the first entry.
+  const adminMode = useAdminMode()
+  const show = (items: unknown[]) => items.length > 0 || adminMode
 
   return (
     <>
@@ -29,22 +34,25 @@ function Resume({ resume }: { resume: ResumeResponse }) {
             {profile.headline} · {profile.location}
           </p>
         </div>
-        {has_pdf && (
-          <div className="flex flex-wrap gap-2">
-            <DownloadButton href={`${RESUME_PDF_URL}?download=1`}>Download PDF</DownloadButton>
-            <Button asChild variant="outline">
-              <a href={RESUME_PDF_URL} target="_blank" rel="noreferrer">
-                Open in new tab
-                <ArrowUpRight data-icon="inline-end" />
-              </a>
-            </Button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {has_pdf && (
+            <>
+              <DownloadButton href={`${RESUME_PDF_URL}?download=1`}>Download PDF</DownloadButton>
+              <Button asChild variant="outline">
+                <a href={RESUME_PDF_URL} target="_blank" rel="noreferrer">
+                  Open in new tab
+                  <ArrowUpRight data-icon="inline-end" />
+                </a>
+              </Button>
+            </>
+          )}
+          <AdminEdit section="resume" label="resume PDF" />
+        </div>
       </header>
 
       <div className="space-y-6">
-        {experience.length > 0 && (
-          <ResumeSection title="Experience">
+        {show(experience) && (
+          <ResumeSection title="Experience" action={<AdminEdit section="experience" />}>
             {experience.map((job) => (
               <ResumeEntry
                 key={`${job.company}-${job.start}`}
@@ -58,8 +66,8 @@ function Resume({ resume }: { resume: ResumeResponse }) {
           </ResumeSection>
         )}
 
-        {education.length > 0 && (
-          <ResumeSection title="Education">
+        {show(education) && (
+          <ResumeSection title="Education" action={<AdminEdit section="education" />}>
             {education.map((school) => (
               <ResumeEntry
                 key={`${school.school}-${school.start}`}
@@ -72,8 +80,8 @@ function Resume({ resume }: { resume: ResumeResponse }) {
           </ResumeSection>
         )}
 
-        {skill_groups.length > 0 && (
-          <ResumeSection title="Skills">
+        {show(skill_groups) && (
+          <ResumeSection title="Skills" action={<AdminEdit section="skills" />}>
             <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-[12rem_1fr]">
               {skill_groups.map((group) => (
                 <Fragment key={group.name}>
@@ -85,8 +93,8 @@ function Resume({ resume }: { resume: ResumeResponse }) {
           </ResumeSection>
         )}
 
-        {awards.length > 0 && (
-          <ResumeSection title="Awards">
+        {show(awards) && (
+          <ResumeSection title="Awards" action={<AdminEdit section="awards" />}>
             {awards.map((award) => (
               <ResumeEntry
                 key={`${award.title}-${award.date}`}
