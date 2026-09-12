@@ -4,12 +4,13 @@
  *
  * Changes from the original: takes photos as props and is sized for a page section instead of a
  * thumbnail; clicking the stack or pressing the arrow keys steps through it; a caption under the
- * stack; screen-reader labels; a unique SVG filter id per instance; the site's theme tokens
- * instead of hard-coded blue/white; and no surrounding panel, with each card taking its photo's
- * own shape (portrait or landscape) instead of a fixed frame.
+ * stack; screen-reader labels; the site's theme tokens instead of hard-coded blue/white; no
+ * surrounding panel, with each card taking its photo's own shape (portrait or landscape) instead
+ * of a fixed frame; and plain rounded corners instead of the original's SVG "squircle" filter,
+ * which Safari re-renders on the CPU for every card on every animation frame, making the stack lag.
  */
 import { AnimatePresence, motion } from 'motion/react'
-import { useId, useState, type KeyboardEvent } from 'react'
+import { useState, type KeyboardEvent } from 'react'
 import type { Photo } from '@/api/types/Photo'
 import { STACK_DEPTH } from '@/lib/photos'
 import { cn } from '@/lib/utils'
@@ -30,8 +31,6 @@ type PhotoTimeMachineProps = {
 export function PhotoTimeMachine({ photos, className }: PhotoTimeMachineProps) {
   const [active, setActive] = useState(0)
   const [hovered, setHovered] = useState<number | null>(null)
-  // useId contains characters that aren't valid in url(#...), so keep only the safe ones.
-  const filterId = `time-machine-${useId().replace(/[^a-zA-Z0-9-]/g, '')}`
 
   const go = (index: number) => setActive(Math.min(photos.length - 1, Math.max(0, index)))
   const scrubTo = (index: number) => {
@@ -70,22 +69,6 @@ export function PhotoTimeMachine({ photos, className }: PhotoTimeMachineProps) {
       onKeyDown={onKeyDown}
       className={cn('flex flex-col gap-5', className)}
     >
-      {/* Blur + alpha threshold gives each photo softly "squircled" corners, as in the original. */}
-      <svg aria-hidden="true" className="absolute size-0">
-        <defs>
-          <filter id={filterId}>
-            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-            <feColorMatrix
-              in="blur"
-              mode="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -6"
-              result="goo"
-            />
-            <feBlend in="SourceGraphic" in2="goo" />
-          </filter>
-        </defs>
-      </svg>
-
       {/* overflow-hidden clips photos as they fly out of the stack. */}
       <div className="relative flex items-center gap-3 overflow-hidden py-4 sm:gap-6">
 
@@ -112,7 +95,7 @@ export function PhotoTimeMachine({ photos, className }: PhotoTimeMachineProps) {
                   scale: isPast ? 1.3 : 1,
                 }}
                 transition={STACK_SPRING}
-                style={{ zIndex: photos.length - i, filter: `url(#${filterId})` }}
+                style={{ zIndex: photos.length - i }}
               >
                 {/* The card shrink-wraps the photo, so portrait and landscape both show whole. */}
                 <img
