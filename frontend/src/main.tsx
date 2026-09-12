@@ -11,13 +11,13 @@ import '@fontsource/playfair-display/500.css'
 import '@fontsource/playfair-display/700.css'
 import '@fontsource/playfair-display/500-italic.css'
 import './index.css'
-import { adoptEarlySite, createQueryClient } from '@/api/queries'
+import { adoptEarlyData, createQueryClient } from '@/api/queries'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { App } from '@/app/App'
 
 const queryClient = createQueryClient()
-adoptEarlySite(queryClient)
+adoptEarlyData(queryClient)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
