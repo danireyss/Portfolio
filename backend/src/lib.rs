@@ -1,4 +1,5 @@
 pub mod admin;
+pub mod aws;
 pub mod content;
 pub mod email;
 mod error;

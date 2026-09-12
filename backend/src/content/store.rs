@@ -17,6 +17,7 @@ use bytes::Bytes;
 use futures::future::try_join_all;
 
 use super::{Content, ContentError};
+use crate::aws::Aws;
 
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
@@ -400,10 +401,9 @@ impl S3ContentStore {
     }
 
     /// Configured by `CONTENT_BUCKET`; `None` when it's unset.
-    pub async fn from_env() -> Option<Self> {
+    pub async fn from_env(aws: &Aws) -> Option<Self> {
         let bucket = std::env::var("CONTENT_BUCKET").ok()?;
-        let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
-        Some(Self::new(aws_sdk_s3::Client::new(&config), bucket))
+        Some(Self::new(aws.s3().await, bucket))
     }
 
     /// An object's bytes, or `None` if it doesn't exist.

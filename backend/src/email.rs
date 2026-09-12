@@ -4,6 +4,8 @@ use async_trait::async_trait;
 use aws_sdk_sesv2::error::DisplayErrorContext;
 use aws_sdk_sesv2::types::{Body, Content as EmailText, Destination, EmailContent, Message};
 
+use crate::aws::Aws;
+
 /// A validated contact-form submission.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ContactMessage {
@@ -48,16 +50,15 @@ pub struct SesMailer {
 impl SesMailer {
     /// Configured by `CONTACT_TO_EMAIL` and `CONTACT_FROM_EMAIL`; `Ok(None)` when
     /// `CONTACT_TO_EMAIL` is unset.
-    pub async fn from_env() -> Result<Option<Self>, MailError> {
+    pub async fn from_env(aws: &Aws) -> Result<Option<Self>, MailError> {
         let Ok(to) = std::env::var("CONTACT_TO_EMAIL") else {
             return Ok(None);
         };
         let from = std::env::var("CONTACT_FROM_EMAIL").map_err(|_| {
             MailError("CONTACT_FROM_EMAIL must be set when CONTACT_TO_EMAIL is".into())
         })?;
-        let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         Ok(Some(Self {
-            client: aws_sdk_sesv2::Client::new(&config),
+            client: aws_sdk_sesv2::Client::new(aws.config().await),
             from,
             to,
         }))

@@ -1,11 +1,12 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use portfolio_api::admin::{
     Admin, BetterAuthSessions, CacheInvalidator, CloudFrontInvalidator, LocalMediaStore,
     MediaStore, NoCdn, S3MediaStore,
 };
+use portfolio_api::aws::Aws;
 use portfolio_api::content::{Content, ContentHandle, LocalContentStore, S3ContentStore};
 use portfolio_api::email::{LogMailer, Mailer, SesMailer};
 use portfolio_api::photos::{CachedPhotoStore, LocalPhotoStore, PhotoStore, S3PhotoStore};
@@ -35,28 +36,19 @@ fn main() -> Result<(), Error> {
 }
 
 async fn run(on_lambda: bool) -> Result<(), Error> {
-    let content = Arc::new(load_content(on_lambda).await?);
-    let mailer: Arc<dyn Mailer> = match SesMailer::from_env().await? {
-        Some(ses) => Arc::new(ses),
-        None => {
-            tracing::warn!(
-                "CONTACT_TO_EMAIL is not set; contact messages will be logged, not sent"
-            );
-            Arc::new(LogMailer)
-        }
-    };
-    let photos: Arc<dyn PhotoStore> = match S3PhotoStore::from_env().await {
-        // Warm Lambda instances reuse a listing for a minute instead of calling S3 per request.
-        Some(s3) => Arc::new(CachedPhotoStore::new(s3, Duration::from_secs(60))),
-        None => {
-            // `make dev` runs from backend/, next to the frontend's (gitignored) photos folder.
-            let dir =
-                std::env::var("PHOTOS_DIR").unwrap_or_else(|_| "../frontend/public/photos".into());
-            tracing::info!(%dir, "MEDIA_BUCKET is not set; listing photos from a local folder");
-            Arc::new(LocalPhotoStore::new(dir))
-        }
-    };
-    let admin = admin_from_env(&content).await?;
+    let started = Instant::now();
+    // Loaded on first use, and shared by every AWS client.
+    let aws = Aws::new();
+    // Independent, so they run together: on Lambda, fetching the content from S3 overlaps
+    // setting up email and photos.
+    let (content, mailer, photos) = tokio::try_join!(
+        load_content(on_lambda, &aws),
+        load_mailer(&aws),
+        load_photos(&aws),
+    )?;
+    let content = Arc::new(content);
+    let admin = admin_from_env(&content, &aws).await;
+    tracing::info!(startup_ms = started.elapsed().as_secs_f64() * 1e3, "ready");
     let app = app(AppState {
         content,
         mailer,
@@ -80,8 +72,8 @@ async fn run(on_lambda: bool) -> Result<(), Error> {
 
 /// `content/` in the S3 bucket named by `CONTENT_BUCKET` when it's set. Otherwise the copy built
 /// into the binary on Lambda, and locally the repo's content/ folder, re-read when files change.
-async fn load_content(on_lambda: bool) -> Result<ContentHandle, Error> {
-    if let Some(s3) = S3ContentStore::from_env().await {
+async fn load_content(on_lambda: bool, aws: &Aws) -> Result<ContentHandle, Error> {
+    if let Some(s3) = S3ContentStore::from_env(aws).await {
         // Other instances' saves show up within this interval.
         return Ok(ContentHandle::from_store(Arc::new(s3), Duration::from_secs(15)).await?);
     }
@@ -93,19 +85,47 @@ async fn load_content(on_lambda: bool) -> Result<ContentHandle, Error> {
     Ok(ContentHandle::from_store(Arc::new(local), Duration::from_secs(1)).await?)
 }
 
+/// Contact messages go through SES when `CONTACT_TO_EMAIL` is set, and to the log otherwise.
+async fn load_mailer(aws: &Aws) -> Result<Arc<dyn Mailer>, Error> {
+    Ok(match SesMailer::from_env(aws).await? {
+        Some(ses) => Arc::new(ses),
+        None => {
+            tracing::warn!(
+                "CONTACT_TO_EMAIL is not set; contact messages will be logged, not sent"
+            );
+            Arc::new(LogMailer)
+        }
+    })
+}
+
+/// Gallery photos are listed from the media bucket when `MEDIA_BUCKET` is set, and from a local
+/// folder otherwise.
+async fn load_photos(aws: &Aws) -> Result<Arc<dyn PhotoStore>, Error> {
+    Ok(match S3PhotoStore::from_env(aws).await {
+        // Warm Lambda instances reuse a listing for a minute instead of calling S3 per request.
+        Some(s3) => Arc::new(CachedPhotoStore::new(s3, Duration::from_secs(60))),
+        None => {
+            // `make dev` runs from backend/, next to the frontend's (gitignored) photos folder.
+            let dir =
+                std::env::var("PHOTOS_DIR").unwrap_or_else(|_| "../frontend/public/photos".into());
+            tracing::info!(%dir, "MEDIA_BUCKET is not set; listing photos from a local folder");
+            Arc::new(LocalPhotoStore::new(dir))
+        }
+    })
+}
+
 /// Admin is on when `ADMIN_EMAIL` (the only account let in) and `AUTH_URL` (the Better Auth
-/// service) are set, and content comes from a store it can save to.
-async fn admin_from_env(content: &ContentHandle) -> Result<Option<Arc<Admin>>, Error> {
-    let Ok(email) = std::env::var("ADMIN_EMAIL") else {
-        return Ok(None);
-    };
-    let Some(auth) = BetterAuthSessions::from_env()? else {
+/// service) are set, and content comes from a store it can save to. Its HTTP and CloudFront
+/// clients are built on the first admin request, not here.
+async fn admin_from_env(content: &ContentHandle, aws: &Aws) -> Option<Arc<Admin>> {
+    let email = std::env::var("ADMIN_EMAIL").ok()?;
+    let Some(auth) = BetterAuthSessions::from_env() else {
         tracing::warn!("ADMIN_EMAIL is set but AUTH_URL isn't, so admin is off");
-        return Ok(None);
+        return None;
     };
     if content.store().is_none() {
         tracing::warn!("admin is off: content is built into the binary, with nowhere to save it");
-        return Ok(None);
+        return None;
     }
     // Changes must come from the site itself (CSRF protection).
     let origins = std::env::var("ADMIN_ORIGINS")
@@ -114,24 +134,24 @@ async fn admin_from_env(content: &ContentHandle) -> Result<Option<Arc<Admin>>, E
         .map(|origin| origin.trim().to_owned())
         .filter(|origin| !origin.is_empty())
         .collect();
-    let media: Arc<dyn MediaStore> = match S3MediaStore::from_env().await {
+    let media: Arc<dyn MediaStore> = match S3MediaStore::from_env(aws).await {
         Some(s3) => Arc::new(s3),
         None => Arc::new(LocalMediaStore::from_env(
             LocalContentStore::from_env().root(),
         )),
     };
-    let cdn: Arc<dyn CacheInvalidator> = match CloudFrontInvalidator::from_env().await {
+    let cdn: Arc<dyn CacheInvalidator> = match CloudFrontInvalidator::from_env(aws) {
         Some(cloudfront) => Arc::new(cloudfront),
         None => Arc::new(NoCdn),
     };
     tracing::info!("admin is on");
-    Ok(Some(Arc::new(Admin::new(
+    Some(Arc::new(Admin::new(
         Arc::new(auth),
         email,
         origins,
         media,
         cdn,
-    ))))
+    )))
 }
 
 /// Resolves on Ctrl+C or SIGTERM (`make dev` stops with either), so pending telemetry is

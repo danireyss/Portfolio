@@ -6,6 +6,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use aws_sdk_cloudfront::error::DisplayErrorContext;
 use aws_sdk_cloudfront::types::{InvalidationBatch, Paths};
+use tokio::sync::OnceCell;
+
+use crate::aws::Aws;
 
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
@@ -28,19 +31,27 @@ impl CacheInvalidator for NoCdn {
 }
 
 pub struct CloudFrontInvalidator {
-    client: aws_sdk_cloudfront::Client,
+    aws: Aws,
     distribution_id: String,
+    /// Built on the first invalidation; most instances never make one.
+    client: OnceCell<aws_sdk_cloudfront::Client>,
 }
 
 impl CloudFrontInvalidator {
     /// Configured by `DISTRIBUTION_ID`; `None` when it's unset.
-    pub async fn from_env() -> Option<Self> {
+    pub fn from_env(aws: &Aws) -> Option<Self> {
         let distribution_id = std::env::var("DISTRIBUTION_ID").ok()?;
-        let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         Some(Self {
-            client: aws_sdk_cloudfront::Client::new(&config),
+            aws: aws.clone(),
             distribution_id,
+            client: OnceCell::new(),
         })
+    }
+
+    async fn client(&self) -> &aws_sdk_cloudfront::Client {
+        self.client
+            .get_or_init(|| async { aws_sdk_cloudfront::Client::new(self.aws.config().await) })
+            .await
     }
 }
 
@@ -68,7 +79,8 @@ impl CacheInvalidator for CloudFrontInvalidator {
             )
             .build()
             .map_err(cdn_error)?;
-        self.client
+        self.client()
+            .await
             .create_invalidation()
             .distribution_id(&self.distribution_id)
             .invalidation_batch(batch)
