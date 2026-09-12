@@ -5,7 +5,7 @@ import type { SiteFile } from '@/api/types/SiteFile'
 import type { UploadKind } from '@/api/types/UploadKind'
 import type { UploadRequest } from '@/api/types/UploadRequest'
 import type { UploadTicket } from '@/api/types/UploadTicket'
-import { optimizeImage } from './images'
+import { HEADSHOT_SIDE, optimizeImage, PHOTO_SIDE } from './images'
 
 const json = (method: string, body: unknown, headers: Record<string, string> = {}) => ({
   method,
@@ -43,7 +43,10 @@ export const adminApi = {
  * locally. Photos and headshots are shrunk first. Resolves to the path it's served from.
  */
 export async function uploadFile(kind: UploadKind, original: File, folder: string | null = null) {
-  const file = kind === 'resume' ? original : await optimizeImage(original)
+  const file =
+    kind === 'resume'
+      ? original
+      : await optimizeImage(original, kind === 'headshot' ? HEADSHOT_SIDE : PHOTO_SIDE)
   const ticket = await adminApi.uploadTicket({ kind, folder, filename: file.name })
   const response = await fetch(ticket.url, { method: 'PUT', headers: ticket.headers, body: file })
   if (!response.ok) {

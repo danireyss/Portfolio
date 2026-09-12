@@ -8,6 +8,24 @@ import {
 import { useCallback } from 'react'
 import { api, isNotFound } from './client'
 
+declare global {
+  interface Window {
+    /** /api/site, requested by index.html before the app's code loaded; see adoptEarlySite. */
+    __site?: Promise<Awaited<ReturnType<typeof api.site>>>
+  }
+}
+
+/**
+ * Hands index.html's early /api/site request to the site query, so the app doesn't fetch it
+ * again and often has the data by its first render. If that request failed, fetches normally.
+ */
+export function adoptEarlySite(queryClient: QueryClient) {
+  const early = window.__site
+  if (!early) return
+  window.__site = undefined
+  void queryClient.prefetchQuery({ ...queries.site(), queryFn: () => early.catch(() => api.site()) })
+}
+
 export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {

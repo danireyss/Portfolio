@@ -1,9 +1,7 @@
-import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowRight, Loader2 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
-import { z } from 'zod'
 import { ApiError } from '@/api/client'
 import { useSendContact } from '@/api/queries'
 import { Button } from '@/components/ui/button'
@@ -11,18 +9,39 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 
-// Mirrors the backend's rules and messages in backend/src/routes/contact.rs.
+// Mirrors the backend's rules and messages in backend/src/routes/contact.rs, which has the final
+// say. Plain functions rather than a schema library keep the contact page's code small.
 const NAME_ERROR = 'Enter your name (up to 100 characters).'
 const EMAIL_ERROR = 'Enter a valid email address.'
 const MESSAGE_ERROR = 'Write between 10 and 5,000 characters.'
 
-const schema = z.object({
-  name: z.string().trim().min(1, NAME_ERROR).max(100, NAME_ERROR),
-  email: z.string().trim().max(254, EMAIL_ERROR).pipe(z.email(EMAIL_ERROR)),
-  message: z.string().trim().min(10, MESSAGE_ERROR).max(5000, MESSAGE_ERROR),
+const trim = (value: string) => value.trim()
+const validName = (name: string) => (name.length >= 1 && name.length <= 100) || NAME_ERROR
+const validMessage = (message: string) =>
+  (message.length >= 10 && message.length <= 5000) || MESSAGE_ERROR
+
+/** Deliberately loose, like the backend's is_valid_email: `local@dotted.domain`, no whitespace. */
+function validEmail(email: string) {
+  const [local, domain, ...rest] = email.split('@')
+  const ok =
+    rest.length === 0 &&
+    !!local &&
+    !!domain &&
+    email.length <= 254 &&
+    domain.includes('.') &&
+    !domain.startsWith('.') &&
+    !domain.endsWith('.') &&
+    !/[\s\p{Cc}]/u.test(email)
+  return ok || EMAIL_ERROR
+}
+
+type ContactValues = {
+  name: string
+  email: string
+  message: string
   /** Honeypot; see the hidden input below. */
-  website: z.string().optional(),
-})
+  website: string
+}
 
 const FIELDS = ['name', 'email', 'message'] as const
 type FieldName = (typeof FIELDS)[number]
@@ -42,8 +61,7 @@ export function ContactForm() {
     reset,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm({
-    resolver: zodResolver(schema),
+  } = useForm<ContactValues>({
     defaultValues: { name: '', email: '', message: '', website: '' },
   })
 
@@ -76,7 +94,7 @@ export function ContactForm() {
           autoComplete="name"
           aria-invalid={!!errors.name}
           aria-describedby={describedBy('name')}
-          {...register('name')}
+          {...register('name', { setValueAs: trim, validate: validName })}
         />
       </FormRow>
       <FormRow id="contact-email" label="Email" error={errors.email?.message}>
@@ -86,7 +104,7 @@ export function ContactForm() {
           autoComplete="email"
           aria-invalid={!!errors.email}
           aria-describedby={describedBy('email')}
-          {...register('email')}
+          {...register('email', { setValueAs: trim, validate: validEmail })}
         />
       </FormRow>
       <FormRow id="contact-message" label="Message" error={errors.message?.message}>
@@ -95,7 +113,7 @@ export function ContactForm() {
           rows={6}
           aria-invalid={!!errors.message}
           aria-describedby={describedBy('message')}
-          {...register('message')}
+          {...register('message', { setValueAs: trim, validate: validMessage })}
         />
       </FormRow>
 

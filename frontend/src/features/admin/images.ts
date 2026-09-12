@@ -1,20 +1,22 @@
-/** Longest side of an uploaded photo or headshot: sharp on high-density screens at the sizes the
- * site shows them (the photo stack is at most 30rem tall). */
-const MAX_SIDE = 1600
+// Longest sides, sharp on high-density screens at the sizes the site shows them.
+/** Gallery photos: the photo stack is at most 30rem tall. */
+export const PHOTO_SIDE = 1600
+/** The headshot: at most 18rem (288px) wide on the home page. */
+export const HEADSHOT_SIDE = 640
 const QUALITY = 0.82
 
 /**
- * Shrinks an image before it's uploaded: at most MAX_SIDE pixels on its longest side, as WebP
+ * Shrinks an image before it's uploaded: at most `maxSide` pixels on its longest side, as WebP
  * (or JPEG where the browser can't make WebP). Phone photos go from megabytes to a few hundred
  * KB, and the site loads them that much faster. Anything it can't improve (GIFs, which may be
  * animated; a browser without these APIs; a result no smaller) is uploaded as it was.
  */
-export async function optimizeImage(file: File): Promise<File> {
+export async function optimizeImage(file: File, maxSide = PHOTO_SIDE): Promise<File> {
   if (file.type === 'image/gif' || typeof createImageBitmap !== 'function') return file
   try {
     // Applies the photo's EXIF rotation, so it's stored the right way up.
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
-    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height))
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height))
     const canvas = document.createElement('canvas')
     canvas.width = Math.round(bitmap.width * scale)
     canvas.height = Math.round(bitmap.height * scale)

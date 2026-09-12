@@ -1,9 +1,9 @@
 import { ArrowRight } from 'lucide-react'
 import { motion } from 'motion/react'
+import { useState } from 'react'
 import { Link } from 'react-router'
 import type { Profile } from '@/api/types/Profile'
 import { AdminEdit } from '@/components/AdminEdit'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { initials } from '@/lib/format'
 import { fadeUp } from '@/lib/motion'
@@ -37,17 +37,38 @@ export function Hero({ profile }: { profile: Profile }) {
         </motion.div>
       </div>
       {profile.headshot && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.96 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4 }}
-        >
-          <Avatar className="size-48 ring-1 ring-border md:size-64 lg:size-72">
-            <AvatarImage src={profile.headshot} alt={profile.name} />
-            <AvatarFallback className="font-heading text-3xl">{initials(profile.name)}</AvatarFallback>
-          </Avatar>
+        // Scales in but isn't faded: it's the page's largest paint, so it shows the moment it loads.
+        <motion.div initial={{ scale: 0.96 }} animate={{ scale: 1 }} transition={{ duration: 0.4 }}>
+          <Headshot key={profile.headshot} src={profile.headshot} name={profile.name} />
         </motion.div>
       )}
     </section>
+  )
+}
+
+/**
+ * A plain <img> fetched at high priority (index.html preloads it on /), in a fixed-size circle
+ * so nothing moves when it arrives; initials if it fails to load.
+ */
+function Headshot({ src, name }: { src: string; name: string }) {
+  const [failed, setFailed] = useState(false)
+  return (
+    <div className="size-48 overflow-hidden rounded-full bg-muted ring-1 ring-border md:size-64 lg:size-72">
+      {failed ? (
+        <span className="flex size-full items-center justify-center font-heading text-3xl text-muted-foreground">
+          {initials(name)}
+        </span>
+      ) : (
+        <img
+          src={src}
+          alt={name}
+          width={288}
+          height={288}
+          fetchPriority="high"
+          onError={() => setFailed(true)}
+          className="size-full object-cover"
+        />
+      )}
+    </div>
   )
 }

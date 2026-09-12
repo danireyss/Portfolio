@@ -18,6 +18,29 @@
         }
       } catch {}
     </script>
+    <script>
+      // Every page needs /api/site, and it names the home page's largest image (the headshot):
+      // request both now instead of after the app's JavaScript has loaded. The app takes over the
+      // response in src/api/queries.ts (adoptEarlySite).
+      window.__site = fetch('/api/site', { headers: { Accept: 'application/json' } }).then((response) => {
+        if (!response.ok) throw new Error(`GET /api/site: ${response.status}`)
+        return response.json()
+      })
+      // The app handles a failure (it fetches again); this only keeps it out of the console.
+      window.__site.catch(() => {})
+      if (location.pathname === '/') {
+        window.__site.then((site) => {
+          const headshot = site.profile && site.profile.headshot
+          if (!headshot) return
+          const link = document.createElement('link')
+          link.rel = 'preload'
+          link.as = 'image'
+          link.href = headshot
+          link.fetchPriority = 'high'
+          document.head.append(link)
+        }, () => {})
+      }
+    </script>
     <meta name="description" content="Daniel Reyes, software engineer: projects, resume, and contact." />
     <title>Daniel Reyes</title>
   </head>

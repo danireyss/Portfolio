@@ -23,8 +23,10 @@ export function QueryState<T>({ query, notFound, children }: QueryStateProps<T>)
 }
 
 export function PageSkeleton() {
+  // At least a screen tall, so the footer stays below the fold while the page loads instead of
+  // jumping away when it arrives (a layout shift).
   return (
-    <div className="space-y-6 py-16" aria-busy="true" aria-label="Loading">
+    <div className="min-h-svh space-y-6 py-16" aria-busy="true" aria-label="Loading">
       <Skeleton className="h-4 w-32" />
       <Skeleton className="h-12 w-2/3" />
       <Skeleton className="h-5 w-full max-w-xl" />
