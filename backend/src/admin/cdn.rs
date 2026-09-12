@@ -1,8 +1,6 @@
 //! Clearing CloudFront's cached API responses after admin changes content, so visitors see it
 //! right away instead of within the cache's 5 minutes.
 
-use std::time::{SystemTime, UNIX_EPOCH};
-
 use async_trait::async_trait;
 use aws_sdk_cloudfront::error::DisplayErrorContext;
 use aws_sdk_cloudfront::types::{InvalidationBatch, Paths};
@@ -64,10 +62,7 @@ impl CacheInvalidator for CloudFrontInvalidator {
     async fn invalidate(&self, paths: &[&str]) -> Result<(), CdnError> {
         let items: Vec<String> = paths.iter().map(|path| (*path).to_owned()).collect();
         // Must be unique per invalidation.
-        let reference = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let reference = crate::since_unix_epoch().as_nanos();
         let batch = InvalidationBatch::builder()
             .caller_reference(format!("admin-{reference}"))
             .paths(

@@ -2,7 +2,6 @@
 //! the same 404 as an unknown path before a body is even read.
 
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use axum::extract::{DefaultBodyLimit, FromRequestParts, Path, State};
 use axum::http::header::{COOKIE, IF_MATCH, ORIGIN};
@@ -15,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::AppState;
-use crate::admin::{Admin, MediaError, UploadKind, UploadTicket};
+use crate::admin::{Admin, MediaError, SessionUser, UploadKind, UploadTicket};
 use crate::content::{
     Content, ContentSources, ContentStore, FrontMatter, ProjectSource, SiteFile, is_slug,
     project_file, site_toml,
@@ -48,30 +47,13 @@ impl FromRequestParts<AppState> for Owner {
     type Rejection = AppError;
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, AppError> {
-        let admin = state.admin.as_ref().ok_or(AppError::NotFound)?;
-        if !parts.method.is_safe() {
-            let origin = parts.headers.get(ORIGIN).and_then(|v| v.to_str().ok());
-            if !origin.is_some_and(|origin| admin.origins.iter().any(|allowed| allowed == origin)) {
-                return Err(AppError::NotFound);
-            }
-        }
-        // HTTP/2 may split cookies across several headers.
-        let cookie = parts
-            .headers
-            .get_all(COOKIE)
-            .iter()
-            .filter_map(|v| v.to_str().ok())
-            .collect::<Vec<_>>()
-            .join("; ");
-        if cookie.is_empty() {
+        let admin = admin(state)?;
+        if !parts.method.is_safe() && !origin_allowed(admin, &parts.headers) {
             return Err(AppError::NotFound);
         }
+        let cookie = cookies(&parts.headers).ok_or(AppError::NotFound)?;
         match admin.auth.user(&cookie).await {
-            Ok(Some(user))
-                if user.email_verified && user.email.eq_ignore_ascii_case(&admin.email) =>
-            {
-                Ok(Owner)
-            }
+            Ok(Some(user)) if is_owner(admin, &user) => Ok(Owner),
             Ok(_) => Err(AppError::NotFound),
             Err(error) => {
                 tracing::warn!(%error, "couldn't check the admin session");
@@ -79,6 +61,31 @@ impl FromRequestParts<AppState> for Owner {
             }
         }
     }
+}
+
+/// Whether the request's `Origin` is one changes may come from (CSRF protection).
+fn origin_allowed(admin: &Admin, headers: &HeaderMap) -> bool {
+    headers
+        .get(ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|origin| admin.origins.iter().any(|allowed| allowed == origin))
+}
+
+/// The request's cookies as one `Cookie` value, or `None` without any. HTTP/2 may split them
+/// across several headers.
+fn cookies(headers: &HeaderMap) -> Option<String> {
+    let cookie = headers
+        .get_all(COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .collect::<Vec<_>>()
+        .join("; ");
+    (!cookie.is_empty()).then_some(cookie)
+}
+
+/// The admin account, with its address verified.
+fn is_owner(admin: &Admin, user: &SessionUser) -> bool {
+    user.email_verified && user.email.eq_ignore_ascii_case(&admin.email)
 }
 
 /// Everything admin edits, from `GET /api/admin/content` and returned by every save.
@@ -249,21 +256,8 @@ async fn save(
 /// An empty store is serving the content built into the binary: save all of it before the first
 /// change, so the rest isn't lost when the store takes over.
 async fn seed(store: &dyn ContentStore, sources: &ContentSources) -> Result<(), AppError> {
-    store
-        .put("site.toml", sources.site_toml.clone().into())
-        .await
-        .map_err(storage)?;
-    for (path, text) in &sources.projects {
-        store
-            .put(path, text.clone().into())
-            .await
-            .map_err(storage)?;
-    }
-    if let Some(pdf) = &sources.resume_pdf {
-        store
-            .put("resume.pdf", pdf.clone())
-            .await
-            .map_err(storage)?;
+    for (path, bytes) in sources.files() {
+        store.put(path, bytes).await.map_err(storage)?;
     }
     Ok(())
 }
@@ -276,12 +270,13 @@ async fn publish(
 ) -> Result<(), AppError> {
     store.touch_version().await.map_err(storage)?;
     state.content.reload().await.map_err(storage)?;
-    state.photos.invalidate();
-    clear_cdn(admin).await;
+    clear_caches(state, admin).await;
     Ok(())
 }
 
-async fn clear_cdn(admin: &Admin) {
+/// Forgets this instance's photo listings and CloudFront's cached API responses.
+async fn clear_caches(state: &AppState, admin: &Admin) {
+    state.photos.invalidate();
     if let Err(error) = admin.cdn.invalidate(&["/api/*"]).await {
         tracing::warn!(%error, "couldn't clear CloudFront's cached API responses; they expire within 5 minutes");
     }
@@ -321,6 +316,17 @@ struct UploadTarget {
     path: String,
 }
 
+impl UploadTarget {
+    /// A file in the media bucket, which CloudFront serves at the same path.
+    fn served(key: String, content_type: &'static str) -> Self {
+        Self {
+            path: format!("/{key}"),
+            key,
+            content_type,
+        }
+    }
+}
+
 fn upload_target(request: &UploadRequest) -> Result<UploadTarget, AppError> {
     let (stem, ext) = split_name(&request.filename);
     let image =
@@ -339,16 +345,11 @@ fn upload_target(request: &UploadRequest) -> Result<UploadTarget, AppError> {
         UploadKind::Headshot => {
             let content_type = image()?;
             // A new name each time, so browsers and CloudFront never show a cached old one.
-            let millis = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis();
-            let key = format!("uploads/headshot-{millis}.{ext}");
-            Ok(UploadTarget {
-                path: format!("/{key}"),
-                key,
+            let millis = crate::since_unix_epoch().as_millis();
+            Ok(UploadTarget::served(
+                format!("uploads/headshot-{millis}.{ext}"),
                 content_type,
-            })
+            ))
         }
         UploadKind::Photo => {
             let folder = request
@@ -357,12 +358,10 @@ fn upload_target(request: &UploadRequest) -> Result<UploadTarget, AppError> {
                 .filter(|folder| is_slug(folder))
                 .ok_or_else(|| invalid("Choose which gallery the photo goes in."))?;
             let content_type = image()?;
-            let key = format!("photos/{folder}/{stem}.{ext}");
-            Ok(UploadTarget {
-                path: format!("/{key}"),
-                key,
+            Ok(UploadTarget::served(
+                format!("photos/{folder}/{stem}.{ext}"),
                 content_type,
-            })
+            ))
         }
     }
 }
@@ -422,8 +421,7 @@ async fn delete_photo(
         .delete(&format!("photos/{folder}/{file}"))
         .await
         .map_err(storage)?;
-    state.photos.invalidate();
-    clear_cdn(admin).await;
+    clear_caches(&state, admin).await;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -442,19 +440,10 @@ mod tests {
 
     #[test]
     fn cleans_up_uploaded_file_names() {
-        let split = |name| {
-            let (stem, ext) = split_name(name);
-            (stem, ext)
-        };
-        assert_eq!(
-            split("My Photo (1).JPG"),
-            ("my-photo-1".into(), "jpg".into())
-        );
-        assert_eq!(split("résumé.pdf"), ("r-sum".into(), "pdf".into()));
-        assert_eq!(split("???.png"), ("photo".into(), "png".into()));
-        assert_eq!(
-            split("no-extension"),
-            ("no-extension".into(), String::new())
-        );
+        let expect = |stem: &str, ext: &str| (stem.to_owned(), ext.to_owned());
+        assert_eq!(split_name("My Photo (1).JPG"), expect("my-photo-1", "jpg"));
+        assert_eq!(split_name("résumé.pdf"), expect("r-sum", "pdf"));
+        assert_eq!(split_name("???.png"), expect("photo", "png"));
+        assert_eq!(split_name("no-extension"), expect("no-extension", ""));
     }
 }

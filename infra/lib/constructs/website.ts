@@ -65,15 +65,18 @@ export class Website extends Construct {
     const securityHeaders = cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS
     const api = new origins.HttpOrigin(props.apiOriginDomain)
     const media = origins.S3BucketOrigin.withOriginAccessControl(props.mediaBucket)
-    // Sign-in and admin: never cached, with every cookie and header passed through.
-    const uncachedApi: cloudfront.BehaviorOptions = {
+    // Every /api/* behavior differs only in how long responses are cached. API Gateway routes on
+    // its own Host header, so everything but Host (cookies included) is forwarded.
+    const apiBehavior = (cachePolicy: cloudfront.ICachePolicy): cloudfront.BehaviorOptions => ({
       origin: api,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
       allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-      cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+      cachePolicy,
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
       responseHeadersPolicy: securityHeaders,
-    }
+    })
+    // Sign-in and admin: never cached.
+    const uncachedApi = apiBehavior(cloudfront.CachePolicy.CACHING_DISABLED)
     const mediaFiles: cloudfront.BehaviorOptions = {
       origin: media,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -101,15 +104,7 @@ export class Website extends Construct {
       additionalBehaviors: {
         '/api/auth/*': uncachedApi,
         '/api/admin/*': uncachedApi,
-        '/api/*': {
-          origin: api,
-          viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.HTTPS_ONLY,
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachePolicy: apiCachePolicy,
-          // API Gateway routes on its own Host header, so forward everything except Host.
-          originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-          responseHeadersPolicy: securityHeaders,
-        },
+        '/api/*': apiBehavior(apiCachePolicy),
         '/photos/*': mediaFiles,
         // Headshots uploaded through admin.
         '/uploads/*': mediaFiles,

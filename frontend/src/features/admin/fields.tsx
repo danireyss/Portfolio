@@ -1,10 +1,25 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
-import { useId, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useId, useState, type ChangeEvent, type ComponentProps, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+
+/** A label above its control, and anything that follows the control, such as a hint. */
+function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+    </div>
+  )
+}
+
+/** The small print under a control. */
+function Hint(props: ComponentProps<'p'>) {
+  return <p className="text-xs text-muted-foreground" {...props} />
+}
 
 type TextFieldProps = {
   label: string
@@ -20,34 +35,19 @@ type TextFieldProps = {
 export function TextField({ label, value, onChange, rows, hint, type = 'text', className }: TextFieldProps) {
   const id = useId()
   const hintId = hint ? `${id}-hint` : undefined
+  // The same whether it's one line or several.
+  const control = {
+    id,
+    value,
+    className,
+    'aria-describedby': hintId,
+    onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(event.target.value),
+  }
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      {rows ? (
-        <Textarea
-          id={id}
-          rows={rows}
-          value={value}
-          className={className}
-          aria-describedby={hintId}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      ) : (
-        <Input
-          id={id}
-          type={type}
-          value={value}
-          className={className}
-          aria-describedby={hintId}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      )}
-      {hint && (
-        <p id={hintId} className="text-xs text-muted-foreground">
-          {hint}
-        </p>
-      )}
-    </div>
+    <Field id={id} label={label}>
+      {rows ? <Textarea rows={rows} {...control} /> : <Input type={type} {...control} />}
+      {hint && <Hint id={hintId}>{hint}</Hint>}
+    </Field>
   )
 }
 
@@ -92,13 +92,20 @@ function SplitTextField({
   )
 }
 
+type StringListFieldProps = {
+  label: string
+  values: string[]
+  onChange: (values: string[]) => void
+  hint?: string
+}
+
 /** Short strings with commas between them, e.g. tags. */
-export function TagsField(props: { label: string; values: string[]; onChange: (values: string[]) => void; hint?: string }) {
+export function TagsField(props: StringListFieldProps) {
   return <SplitTextField {...props} separator="," hint={props.hint ?? 'Separate them with commas.'} />
 }
 
 /** One string per line, e.g. a job's bullet points. */
-export function LinesField(props: { label: string; values: string[]; onChange: (values: string[]) => void; hint?: string }) {
+export function LinesField(props: StringListFieldProps) {
   return <SplitTextField {...props} separator={'\n'} rows={4} hint={props.hint ?? 'One per line.'} />
 }
 
@@ -125,7 +132,7 @@ export function CheckboxField({
       />
       <div className="grid gap-1">
         <Label htmlFor={id}>{label}</Label>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        {hint && <Hint>{hint}</Hint>}
       </div>
     </div>
   )
@@ -141,8 +148,7 @@ type SelectFieldProps<T extends string> = {
 export function SelectField<T extends string>({ label, value, options, onChange }: SelectFieldProps<T>) {
   const id = useId()
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+    <Field id={id} label={label}>
       <select
         id={id}
         value={value}
@@ -155,7 +161,7 @@ export function SelectField<T extends string>({ label, value, options, onChange 
           </option>
         ))}
       </select>
-    </div>
+    </Field>
   )
 }
 
@@ -193,14 +199,16 @@ export function UploadField({
   }
 
   return (
-    <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+    <Field id={id} label={label}>
       <Input id={id} type="file" accept={accept} multiple={multiple} disabled={busy} onChange={onChange} />
-      <p className="text-xs text-muted-foreground" aria-live="polite">
-        {busy ? 'Uploading…' : hint}
-      </p>
-    </div>
+      <Hint aria-live="polite">{busy ? 'Uploading…' : hint}</Hint>
+    </Field>
   )
+}
+
+/** An icon-only button in a list item's header; `label` names it for screen readers. */
+function IconButton({ label, ...props }: Omit<ComponentProps<typeof Button>, 'aria-label'> & { label: string }) {
+  return <Button type="button" variant="ghost" size="icon-sm" aria-label={label} {...props} />
 }
 
 type ListFieldProps<T> = {
@@ -225,6 +233,7 @@ export function ListField<T>({ label, items, onChange, newItem, itemLabel, rende
     next.splice(to, 0, item)
     onChange(next)
   }
+  const remove = (index: number) => onChange(items.filter((_, i) => i !== index))
 
   return (
     <fieldset className="grid gap-3">
@@ -239,35 +248,19 @@ export function ListField<T>({ label, items, onChange, newItem, itemLabel, rende
             <div className="flex items-center justify-between gap-2">
               <p className="truncate text-sm text-muted-foreground">{name}</p>
               <div className="flex shrink-0">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Move ${name} up`}
-                  disabled={index === 0}
-                  onClick={() => move(index, index - 1)}
-                >
+                <IconButton label={`Move ${name} up`} disabled={index === 0} onClick={() => move(index, index - 1)}>
                   <ArrowUp />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Move ${name} down`}
+                </IconButton>
+                <IconButton
+                  label={`Move ${name} down`}
                   disabled={index === items.length - 1}
                   onClick={() => move(index, index + 1)}
                 >
                   <ArrowDown />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Remove ${name}`}
-                  onClick={() => onChange(items.filter((_, i) => i !== index))}
-                >
+                </IconButton>
+                <IconButton label={`Remove ${name}`} onClick={() => remove(index)}>
                   <Trash2 />
-                </Button>
+                </IconButton>
               </div>
             </div>
             {render(item, (next) => update(index, next), index)}

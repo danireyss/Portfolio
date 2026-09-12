@@ -7,31 +7,8 @@ import {
 } from '@tanstack/react-query'
 import { useCallback } from 'react'
 import { api, isNotFound } from './client'
-
-declare global {
-  interface Window {
-    /** Requested by index.html before the app's code loaded; see adoptEarlyData. */
-    __early?: {
-      site: Promise<Awaited<ReturnType<typeof api.site>>>
-      photos: Promise<Awaited<ReturnType<typeof api.photos>>>
-    }
-  }
-}
-
-/**
- * Hands index.html's early requests to their queries, so the app doesn't fetch them again and
- * usually has the data by its first render. A request that failed is fetched again normally.
- */
-export function adoptEarlyData(queryClient: QueryClient) {
-  const early = window.__early
-  if (!early) return
-  window.__early = undefined
-  void queryClient.prefetchQuery({ ...queries.site(), queryFn: () => early.site.catch(() => api.site()) })
-  void queryClient.prefetchQuery({
-    ...queries.photos(),
-    queryFn: () => early.photos.catch(() => api.photos()),
-  })
-}
+import type { PhotosResponse } from './types/PhotosResponse'
+import type { SiteResponse } from './types/SiteResponse'
 
 export function createQueryClient() {
   return new QueryClient({
@@ -53,6 +30,25 @@ export const queries = {
     queryOptions({ queryKey: ['project', slug], queryFn: () => api.project(slug) }),
   resume: () => queryOptions({ queryKey: ['resume'], queryFn: api.resume }),
   photos: () => queryOptions({ queryKey: ['photos'], queryFn: api.photos }),
+}
+
+declare global {
+  interface Window {
+    /** Requested by index.html before the app's code loaded; see adoptEarlyData. */
+    __early?: { site: Promise<SiteResponse>; photos: Promise<PhotosResponse> }
+  }
+}
+
+/**
+ * Hands index.html's early requests to their queries, so the app doesn't fetch them again and
+ * usually has the data by its first render. A request that failed is fetched again normally.
+ */
+export function adoptEarlyData(queryClient: QueryClient) {
+  const early = window.__early
+  if (!early) return
+  window.__early = undefined
+  void queryClient.prefetchQuery({ ...queries.site(), queryFn: () => early.site.catch(() => api.site()) })
+  void queryClient.prefetchQuery({ ...queries.photos(), queryFn: () => early.photos.catch(() => api.photos()) })
 }
 
 export const useSite = () => useQuery(queries.site())

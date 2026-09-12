@@ -1,12 +1,14 @@
 //! Who's signed in, according to the Better Auth service in `auth/`.
 
 use std::collections::HashMap;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokio::sync::OnceCell;
+
+use crate::sync::MutexExt;
 
 /// The account behind a session.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,21 +69,15 @@ impl BetterAuthSessions {
     }
 
     fn cached(&self, cookie: &str) -> Option<SessionUser> {
-        let confirmed = self
-            .confirmed
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        confirmed
+        self.confirmed
+            .lock_ignoring_poison()
             .get(cookie)
             .filter(|(at, _)| at.elapsed() < CACHE_FOR)
             .map(|(_, user)| user.clone())
     }
 
     fn remember(&self, cookie: &str, user: &SessionUser) {
-        let mut confirmed = self
-            .confirmed
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+        let mut confirmed = self.confirmed.lock_ignoring_poison();
         confirmed.retain(|_, (at, _)| at.elapsed() < CACHE_FOR);
         if confirmed.len() < MAX_CACHED {
             confirmed.insert(cookie.to_owned(), (Instant::now(), user.clone()));

@@ -5,9 +5,11 @@ pub mod email;
 mod error;
 pub mod photos;
 mod routes;
+mod sync;
 pub mod telemetry;
 
 use std::sync::Arc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::Router;
 use tower_http::trace::TraceLayer;
@@ -42,4 +44,12 @@ pub fn app(state: AppState) -> Router {
                 .make_span_with(telemetry::request_span)
                 .on_response(telemetry::on_response),
         )
+}
+
+/// The time since the Unix epoch, for stamps that only need to be unique and increasing (a clock
+/// set before 1970 gives zero).
+pub(crate) fn since_unix_epoch() -> Duration {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
 }
