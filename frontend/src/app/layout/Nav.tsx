@@ -2,7 +2,7 @@ import { Menu } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router'
-import { usePhotos, useSite } from '@/api/queries'
+import { usePhotos, usePrefetchPage, useSite } from '@/api/queries'
 import { ThemeToggle } from '@/components/amicro/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import {
@@ -36,6 +36,14 @@ export function Nav() {
   const hasGalleries = photos.data?.galleries.some((gallery) => gallery.photos.length > 0) ?? false
   const links = LINKS.filter((link) => !link.needsGalleries || hasGalleries)
   const theme = useTheme()
+  // Pointing at (or tabbing to, or touching) a link starts fetching its page's data, so the page
+  // usually opens with it already there.
+  const prefetch = usePrefetchPage()
+  const prefetchOn = (to: string) => ({
+    onMouseEnter: () => prefetch(to),
+    onFocus: () => prefetch(to),
+    onTouchStart: () => prefetch(to),
+  })
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 h-[70px] border-b border-border/60 bg-background/80 backdrop-blur">
@@ -56,6 +64,7 @@ export function Nav() {
                   <NavigationMenuLink asChild active={isActive(to)}>
                     <Link
                       to={to}
+                      {...prefetchOn(to)}
                       className="relative bg-transparent hover:bg-transparent focus:bg-transparent data-active:bg-transparent data-active:text-primary data-active:hover:bg-transparent data-active:focus:bg-transparent"
                     >
                       {label}
@@ -88,6 +97,7 @@ export function Nav() {
                   <Link
                     key={to}
                     to={to}
+                    {...prefetchOn(to)}
                     onClick={() => setMenuOpen(false)}
                     aria-current={isActive(to) ? 'page' : undefined}
                     className={cn(

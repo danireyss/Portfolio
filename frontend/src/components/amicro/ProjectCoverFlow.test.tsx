@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
@@ -8,10 +9,13 @@ import { ProjectCoverFlow } from './ProjectCoverFlow'
 const three = [...projects.projects, { ...projects.projects[0]!, slug: 'gamma', title: 'Gamma' }]
 
 it('starts in the middle and moves with the buttons, dots, and arrow keys', async () => {
+  // The Details link prefetches its project's data, which needs a query client.
   render(
-    <MemoryRouter>
-      <ProjectCoverFlow projects={three} />
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter>
+        <ProjectCoverFlow projects={three} />
+      </MemoryRouter>
+    </QueryClientProvider>,
   )
   const user = userEvent.setup()
   const current = () => screen.getByRole('button', { current: true })

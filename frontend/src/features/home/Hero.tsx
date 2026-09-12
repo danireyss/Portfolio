@@ -18,13 +18,13 @@ export function Hero({ profile }: { profile: Profile }) {
           </motion.p>
           <AdminEdit section="profile" />
         </div>
-        <motion.h1 className="mt-4 text-5xl leading-[1.05] md:text-6xl" {...fadeUp(0.08)}>
+        <motion.h1 className="mt-4 text-5xl leading-[1.05] md:text-6xl" {...fadeUp(0.05)}>
           Hi, I'm <span className="text-primary italic">{profile.name}</span>
         </motion.h1>
-        <motion.p className="mt-6 text-lg leading-relaxed text-prose" {...fadeUp(0.16)}>
+        <motion.p className="mt-6 text-lg leading-relaxed text-prose" {...fadeUp(0.1)}>
           {profile.tagline}
         </motion.p>
-        <motion.div className="mt-8 flex flex-wrap gap-3" {...fadeUp(0.24)}>
+        <motion.div className="mt-8 flex flex-wrap gap-3" {...fadeUp(0.15)}>
           <Button asChild size="lg">
             <Link to="/projects">
               View projects
@@ -38,9 +38,9 @@ export function Hero({ profile }: { profile: Profile }) {
       </div>
       {profile.headshot && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.94 }}
+          initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.4 }}
         >
           <Avatar className="size-48 ring-1 ring-border md:size-64 lg:size-72">
             <AvatarImage src={profile.headshot} alt={profile.name} />

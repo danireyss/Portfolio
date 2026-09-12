@@ -1,16 +1,18 @@
-import { AnimatePresence, motion } from 'motion/react'
-import { Suspense } from 'react'
-import { useLocation, useOutlet } from 'react-router'
+import { motion } from 'motion/react'
+import { Suspense, useLayoutEffect } from 'react'
+import { Outlet, useLocation } from 'react-router'
 import { AdminBarSlot } from '@/components/AdminEdit'
 import { PageSkeleton } from '@/components/QueryState'
-import { EASE_OUT } from '@/lib/motion'
 import { Footer } from './Footer'
 import { Nav } from './Nav'
 
 export function Layout() {
   const { pathname } = useLocation()
-  // AnimatePresence keeps the old outlet element mounted while it animates out.
-  const outlet = useOutlet()
+
+  // Each page starts at the top; set before paint, so the old scroll position never flashes.
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -21,20 +23,20 @@ export function Layout() {
         Skip to content
       </a>
       <Nav />
-      <AnimatePresence mode="wait" onExitComplete={() => window.scrollTo(0, 0)}>
-        <motion.main
-          key={pathname}
-          id="main"
-          className="page flex-1 pt-[70px]"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.25, ease: EASE_OUT }}
-        >
-          {/* Lazy-loaded pages show the skeleton while their code downloads. */}
-          <Suspense fallback={<PageSkeleton />}>{outlet}</Suspense>
-        </motion.main>
-      </AnimatePresence>
+      {/* Pages swap at once and fade in quickly; nothing waits for the old page to animate out. */}
+      <motion.main
+        key={pathname}
+        id="main"
+        className="page flex-1 pt-[70px]"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
+      >
+        {/* A page whose code hasn't loaded yet shows the skeleton meanwhile. */}
+        <Suspense fallback={<PageSkeleton />}>
+          <Outlet />
+        </Suspense>
+      </motion.main>
       <Footer />
       <AdminBarSlot />
     </div>

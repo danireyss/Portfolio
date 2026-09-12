@@ -1,18 +1,27 @@
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
+import { usePrefetchPage } from '@/api/queries'
 import type { ProjectSummary } from '@/api/types/ProjectSummary'
 import { TechIcon } from '@/components/TechIcon'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function ProjectCard({ project }: { project: ProjectSummary }) {
+  const prefetch = usePrefetchPage()
+  const path = `/projects/${project.slug}`
   return (
     <Card className="group relative h-full transition-colors hover:border-gold-dim has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring">
       <CardHeader>
         <p className="eyebrow">{project.category}</p>
         <CardTitle className="font-heading text-2xl text-heading">
           {/* Stretched link: the whole card is clickable, but only the title is announced. */}
-          <Link to={`/projects/${project.slug}`} className="outline-none after:absolute after:inset-0">
+          <Link
+            to={path}
+            className="outline-none after:absolute after:inset-0"
+            onMouseEnter={() => prefetch(path)}
+            onFocus={() => prefetch(path)}
+            onTouchStart={() => prefetch(path)}
+          >
             {project.title}
           </Link>
         </CardTitle>

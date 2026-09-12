@@ -5,6 +5,7 @@ import type { SiteFile } from '@/api/types/SiteFile'
 import type { UploadKind } from '@/api/types/UploadKind'
 import type { UploadRequest } from '@/api/types/UploadRequest'
 import type { UploadTicket } from '@/api/types/UploadTicket'
+import { optimizeImage } from './images'
 
 const json = (method: string, body: unknown, headers: Record<string, string> = {}) => ({
   method,
@@ -39,13 +40,14 @@ export const adminApi = {
 
 /**
  * Uploads a file where the API says: straight to the media bucket in production, or to the API
- * locally. Resolves to the path it's served from.
+ * locally. Photos and headshots are shrunk first. Resolves to the path it's served from.
  */
-export async function uploadFile(kind: UploadKind, file: File, folder: string | null = null) {
+export async function uploadFile(kind: UploadKind, original: File, folder: string | null = null) {
+  const file = kind === 'resume' ? original : await optimizeImage(original)
   const ticket = await adminApi.uploadTicket({ kind, folder, filename: file.name })
   const response = await fetch(ticket.url, { method: 'PUT', headers: ticket.headers, body: file })
   if (!response.ok) {
-    throw new Error(`Uploading ${file.name} failed (${response.status}).`)
+    throw new Error(`Uploading ${original.name} failed (${response.status}).`)
   }
   return ticket.path
 }

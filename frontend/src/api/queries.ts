@@ -1,4 +1,11 @@
-import { QueryClient, useMutation, useQuery } from '@tanstack/react-query'
+import {
+  QueryClient,
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+import { useCallback } from 'react'
 import { api, isNotFound } from './client'
 
 export function createQueryClient() {
@@ -13,18 +20,50 @@ export function createQueryClient() {
   })
 }
 
-export const useSite = () => useQuery({ queryKey: ['site'], queryFn: api.site })
+/** How each resource is cached and fetched; shared by the hooks below and by prefetching. */
+export const queries = {
+  site: () => queryOptions({ queryKey: ['site'], queryFn: api.site }),
+  projects: () => queryOptions({ queryKey: ['projects'], queryFn: api.projects }),
+  project: (slug: string) =>
+    queryOptions({ queryKey: ['project', slug], queryFn: () => api.project(slug) }),
+  resume: () => queryOptions({ queryKey: ['resume'], queryFn: api.resume }),
+  photos: () => queryOptions({ queryKey: ['photos'], queryFn: api.photos }),
+}
 
-export const useProjects = () =>
-  useQuery({ queryKey: ['projects'], queryFn: api.projects })
+export const useSite = () => useQuery(queries.site())
 
-export const useProject = (slug: string) =>
-  useQuery({ queryKey: ['project', slug], queryFn: () => api.project(slug) })
+export const useProjects = () => useQuery(queries.projects())
 
-export const useResume = () =>
-  useQuery({ queryKey: ['resume'], queryFn: api.resume })
+export const useProject = (slug: string) => useQuery(queries.project(slug))
 
-export const usePhotos = () =>
-  useQuery({ queryKey: ['photos'], queryFn: api.photos })
+export const useResume = () => useQuery(queries.resume())
+
+export const usePhotos = () => useQuery(queries.photos())
 
 export const useSendContact = () => useMutation({ mutationFn: api.contact })
+
+/** Starts fetching what the page at `path` shows. Data that's already cached isn't refetched. */
+export function prefetchPageData(queryClient: QueryClient, path: string) {
+  if (path === '/') {
+    void queryClient.prefetchQuery(queries.site())
+    void queryClient.prefetchQuery(queries.projects())
+  } else if (path === '/projects') {
+    void queryClient.prefetchQuery(queries.projects())
+  } else if (path.startsWith('/projects/')) {
+    const slug = decodeURIComponent(path.slice('/projects/'.length))
+    void queryClient.prefetchQuery(queries.project(slug))
+  } else if (path === '/photos') {
+    void queryClient.prefetchQuery(queries.photos())
+  } else if (path === '/resume') {
+    void queryClient.prefetchQuery(queries.resume())
+  }
+}
+
+/**
+ * For links: call it on hover or focus, so the page opens with its data already there.
+ * (Every page's code is preloaded once the site is idle; see app/pages.ts.)
+ */
+export function usePrefetchPage() {
+  const queryClient = useQueryClient()
+  return useCallback((path: string) => prefetchPageData(queryClient, path), [queryClient])
+}
