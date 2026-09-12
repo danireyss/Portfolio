@@ -13,6 +13,8 @@ use bytes::Bytes;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::aws::Aws;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export)]
@@ -87,10 +89,9 @@ impl S3MediaStore {
     }
 
     /// Configured by `MEDIA_BUCKET`; `None` when it's unset.
-    pub async fn from_env() -> Option<Self> {
+    pub async fn from_env(aws: &Aws) -> Option<Self> {
         let bucket = std::env::var("MEDIA_BUCKET").ok()?;
-        let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
-        Some(Self::new(aws_sdk_s3::Client::new(&config), bucket))
+        Some(Self::new(aws.s3().await, bucket))
     }
 }
 

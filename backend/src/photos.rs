@@ -11,6 +11,8 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use aws_sdk_s3::error::DisplayErrorContext;
 
+use crate::aws::Aws;
+
 const IMAGE_EXTENSIONS: [&str; 6] = ["jpg", "jpeg", "png", "webp", "avif", "gif"];
 
 #[derive(Debug, thiserror::Error)]
@@ -42,11 +44,10 @@ pub struct S3PhotoStore {
 
 impl S3PhotoStore {
     /// Configured by `MEDIA_BUCKET`; `None` when it's unset.
-    pub async fn from_env() -> Option<Self> {
+    pub async fn from_env(aws: &Aws) -> Option<Self> {
         let bucket = std::env::var("MEDIA_BUCKET").ok()?;
-        let config = aws_config::load_defaults(aws_config::BehaviorVersion::latest()).await;
         Some(Self {
-            client: aws_sdk_s3::Client::new(&config),
+            client: aws.s3().await,
             bucket,
         })
     }

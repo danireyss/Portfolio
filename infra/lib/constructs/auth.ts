@@ -38,7 +38,9 @@ export class Auth extends Construct {
       depsLockFilePath: join(props.projectRoot, 'package-lock.json'),
       runtime: lambda.Runtime.NODEJS_24_X,
       architecture: lambda.Architecture.ARM_64,
-      memorySize: 512,
+      // CPU scales with memory: at 512 MB a warm session check took ~300 ms of cookie crypto.
+      // It's only called when signing in and on admin requests, so the extra memory costs ~nothing.
+      memorySize: 1024,
       timeout: Duration.seconds(10),
       bundling: {
         format: nodejs.OutputFormat.ESM,

@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use serde::Deserialize;
+use tokio::sync::OnceCell;
 
 /// The account behind a session.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -33,31 +34,36 @@ const MAX_CACHED: usize = 32;
 /// Asks the Better Auth service: `GET <AUTH_URL>/api/auth/get-session`, with the browser's
 /// cookies. Only sessions that were confirmed are cached, so bogus cookies can't fill the cache.
 pub struct BetterAuthSessions {
-    client: reqwest::Client,
+    /// Built on the first admin request, so visitors' cold starts don't pay for its TLS setup.
+    client: OnceCell<reqwest::Client>,
     url: String,
     confirmed: Mutex<HashMap<String, (Instant, SessionUser)>>,
 }
 
 impl BetterAuthSessions {
     /// `base_url` is where the auth service is reached, e.g. "http://localhost:3002".
-    pub fn new(base_url: &str) -> Result<Self, AuthError> {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()
-            .map_err(|e| AuthError(e.to_string()))?;
-        Ok(Self {
-            client,
+    pub fn new(base_url: &str) -> Self {
+        Self {
+            client: OnceCell::new(),
             url: format!("{}/api/auth/get-session", base_url.trim_end_matches('/')),
             confirmed: Mutex::default(),
-        })
+        }
     }
 
     /// Configured by `AUTH_URL`; `None` when it's unset.
-    pub fn from_env() -> Result<Option<Self>, AuthError> {
-        std::env::var("AUTH_URL")
-            .ok()
-            .map(|url| Self::new(&url))
-            .transpose()
+    pub fn from_env() -> Option<Self> {
+        std::env::var("AUTH_URL").ok().map(|url| Self::new(&url))
+    }
+
+    async fn client(&self) -> Result<&reqwest::Client, AuthError> {
+        self.client
+            .get_or_try_init(|| async {
+                reqwest::Client::builder()
+                    .timeout(Duration::from_secs(5))
+                    .build()
+                    .map_err(|e| AuthError(e.to_string()))
+            })
+            .await
     }
 
     fn cached(&self, cookie: &str) -> Option<SessionUser> {
@@ -90,7 +96,8 @@ impl AdminAuth for BetterAuthSessions {
             return Ok(Some(user));
         }
         let response = self
-            .client
+            .client()
+            .await?
             .get(&self.url)
             .header(reqwest::header::COOKIE, cookie)
             .send()
