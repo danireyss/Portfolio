@@ -7,10 +7,39 @@
 
 /*
  * The template's palette (peterpinto.dev) mapped onto shadcn's semantic tokens, so shadcn and
- * Amicro components share one theme. The site is dark-only: index.html sets class="dark" so
- * shadcn's dark: variants apply.
+ * Amicro components share one theme. Dark is the default: index.html starts with class="dark",
+ * which the nav's toggle removes (see src/lib/theme.ts). The light palette keeps the same warm
+ * tones on paper, with a deeper gold so gold text stays readable.
  */
 :root {
+  color-scheme: light;
+  --background: #f7f4ee;
+  --foreground: #2b2823;
+  --card: #fdfbf7;
+  --card-foreground: #2b2823;
+  --popover: #fdfbf7;
+  --popover-foreground: #2b2823;
+  --primary: #80622a;
+  --primary-foreground: #fdfbf7;
+  --secondary: #ece6da;
+  --secondary-foreground: #2b2823;
+  --muted: #ece6da;
+  --muted-foreground: #6b655b;
+  --accent: #ece6da;
+  --accent-foreground: #1a1814;
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: #ddd5c6;
+  --input: #ddd5c6;
+  --ring: #b0915a;
+  --radius: 0.375rem;
+
+  --heading: #1a1814;
+  --prose: #45403a;
+  --gold-dim: #a8884e;
+}
+
+.dark {
+  color-scheme: dark;
   --background: #0d0d0d;
   --foreground: #e8e4dc;
   --card: #151515;
@@ -29,7 +58,6 @@
   --border: #2a2a2a;
   --input: #2a2a2a;
   --ring: #8a7248;
-  --radius: 0.375rem;
 
   /* Template extras: headings, body copy, and the dimmed gold. */
   --heading: #f5f2ec;
@@ -87,7 +115,6 @@
   }
   html {
     @apply scroll-smooth bg-background font-sans antialiased;
-    color-scheme: dark;
   }
   @media (prefers-reduced-motion: reduce) {
     html {

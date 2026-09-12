@@ -72,7 +72,7 @@ export function ProjectCoverFlow({ projects, className }: ProjectCoverFlowProps)
               >
                 <article
                   className={cn(
-                    'flex aspect-[4/5] flex-col rounded-xl border bg-card p-6 shadow-2xl shadow-black/50 transition-colors',
+                    'flex aspect-[4/5] flex-col rounded-xl border bg-card p-6 shadow-2xl shadow-black/15 transition-colors dark:shadow-black/50',
                     isActive ? 'border-gold-dim' : 'cursor-pointer border-border',
                   )}
                 >

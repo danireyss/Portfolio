@@ -1,6 +1,6 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import { alphaDetail, photosResponse, projects, site } from '@/test/fixtures'
 import { jsonResponse, mockApi, renderApp } from '@/test/utils'
 
@@ -131,5 +131,33 @@ describe('contact form', () => {
 
     await fillAndSubmit()
     expect(await screen.findByText('That address bounced.')).toBeInTheDocument()
+  })
+})
+
+describe('theme toggle', () => {
+  const root = document.documentElement
+  afterEach(() => {
+    root.classList.remove('dark')
+    localStorage.clear()
+  })
+
+  it('switches between dark and light and remembers the choice', async () => {
+    // index.html starts in dark mode.
+    root.classList.add('dark')
+    mockApi({ '/api/site': site, '/api/projects': projects })
+    renderApp('/')
+    const user = userEvent.setup()
+    const toggle = screen.getByRole('switch', { name: 'Dark theme' })
+    expect(toggle).toBeChecked()
+
+    await user.click(toggle)
+    expect(toggle).not.toBeChecked()
+    expect(root).not.toHaveClass('dark')
+    expect(localStorage.getItem('theme')).toBe('light')
+
+    await user.click(toggle)
+    expect(toggle).toBeChecked()
+    expect(root).toHaveClass('dark')
+    expect(localStorage.getItem('theme')).toBe('dark')
   })
 })
