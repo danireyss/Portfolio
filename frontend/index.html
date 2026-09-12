@@ -5,6 +5,19 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0d0d0d" />
+    <!-- The site has its own dark theme, so the Dark Reader extension shouldn't re-darken the
+         light one (it turns the page olive and the photo stack purple). -->
+    <meta name="darkreader-lock" />
+    <script>
+      // Before first paint, so a visitor who picked light doesn't see a dark flash. Keep the key
+      // and color in sync with src/lib/theme.ts.
+      try {
+        if (localStorage.getItem('theme') === 'light') {
+          document.documentElement.classList.remove('dark')
+          document.querySelector('meta[name="theme-color"]').content = '#f7f4ee'
+        }
+      } catch {}
+    </script>
     <meta name="description" content="Daniel Reyes, software engineer: projects, resume, and contact." />
     <title>Daniel Reyes</title>
   </head>
