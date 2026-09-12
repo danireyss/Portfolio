@@ -1,9 +1,16 @@
 .PHONY: dev dev-otel backend frontend test bench flamegraph build build-frontend build-backend synth deploy deploy-github-role upload-photos
 
-# Run the Axum API (:3000) and the Vite dev server (:5173) together.
+# Admin sign-in for `make dev`: the API asks the auth service (:3002) who's signed in, and only
+# lets ADMIN_EMAIL in. Both come from auth/.env (copy auth/.env.example); without it the site
+# still runs, with admin off.
+ADMIN_EMAIL ?= $(shell sed -n 's/^ADMIN_EMAIL=//p' auth/.env 2>/dev/null)
+ADMIN_ENV = ADMIN_EMAIL=$(ADMIN_EMAIL) AUTH_URL=http://localhost:3002 ADMIN_ORIGINS=http://localhost:5173
+
+# Run the Axum API (:3000), the auth service (:3002), and the Vite dev server (:5173) together.
 dev:
 	@trap 'kill 0' EXIT; \
-	(cd backend && cargo run) & \
+	(cd backend && $(ADMIN_ENV) cargo run) & \
+	(cd auth && npm run dev) & \
 	(cd frontend && npm run dev) & \
 	wait
 
@@ -12,11 +19,12 @@ dev:
 # so the API runs on :3001 and Vite's proxy follows it.
 dev-otel:
 	@trap 'kill 0' EXIT; \
-	(cd backend && PORT=3001 \
+	(cd backend && PORT=3001 $(ADMIN_ENV) \
 		OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
 		OTEL_SERVICE_NAME=portfolio-api \
 		OTEL_RESOURCE_ATTRIBUTES=service.namespace=portfolio,deployment.environment=local \
 		cargo run) & \
+	(cd auth && npm run dev) & \
 	(cd frontend && API_PORT=3001 npm run dev) & \
 	wait
 
@@ -29,6 +37,7 @@ frontend:
 test:
 	cd backend && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
 	cd frontend && npm run lint && npm run typecheck && npm test
+	cd auth && npm run lint && npm run typecheck && npm test
 	cd infra && npx tsc --noEmit && npm test
 
 # Request latency with hyperfine (local release build + the live site); see scripts/bench.sh.

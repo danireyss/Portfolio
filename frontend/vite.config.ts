@@ -12,8 +12,12 @@ export default defineConfig({
   },
   server: {
     // The Axum backend runs on :3000 in dev (`cargo run` in backend/); `make dev-otel` moves it
-    // to API_PORT=3001 because the telemetry stack's Grafana uses :3000.
-    proxy: { '/api': `http://localhost:${process.env.API_PORT ?? 3000}` },
+    // to API_PORT=3001 because the telemetry stack's Grafana uses :3000. Sign-in (/api/auth) goes
+    // to the Better Auth service in auth/ instead; the first matching prefix wins.
+    proxy: {
+      '/api/auth': `http://localhost:${process.env.AUTH_PORT ?? 3002}`,
+      '/api': `http://localhost:${process.env.API_PORT ?? 3000}`,
+    },
   },
   test: {
     environment: 'jsdom',
