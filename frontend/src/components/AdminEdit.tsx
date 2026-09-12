@@ -10,13 +10,22 @@ const AdminBar = lazy(async () => ({
   default: (await import('@/features/admin/AdminBar')).AdminBar,
 }))
 
+type AdminEditProps = {
+  section: EditorKey
+  /** Which one, for editors of one of several (a project's slug, a gallery's folder). */
+  target?: string
+  /** What's being edited, e.g. a project's title. */
+  label?: string
+  className?: string
+}
+
 /** In admin mode, a button that opens the editor for part of the page; otherwise nothing. */
-export function AdminEdit({ section, className }: { section: EditorKey; className?: string }) {
+export function AdminEdit(props: AdminEditProps) {
   const adminMode = useAdminMode()
   if (!adminMode) return null
   return (
     <Suspense fallback={null}>
-      <EditButton section={section} className={className} />
+      <EditButton {...props} />
     </Suspense>
   )
 }

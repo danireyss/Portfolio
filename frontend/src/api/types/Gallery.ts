@@ -4,4 +4,8 @@ import type { Photo } from "./Photo";
 /**
  * A gallery as served by /api/photos: its settings plus the photos found in its folder.
  */
-export type Gallery = { title: string, description: string | null, photos: Array<Photo>, };
+export type Gallery = { 
+/**
+ * Its folder under `photos/`; admin finds the gallery by it.
+ */
+folder: string, title: string, description: string | null, photos: Array<Photo>, };

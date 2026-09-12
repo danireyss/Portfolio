@@ -1,6 +1,7 @@
 import type { Profile } from '@/api/types/Profile'
+import { uploadFile } from '../api'
 import { EditorForm } from '../EditorForm'
-import { OptionalTextField, TextField } from '../fields'
+import { OptionalTextField, TextField, UploadField } from '../fields'
 import type { EditorProps } from '../types'
 import { useSiteDraft } from '../useSiteDraft'
 
@@ -24,9 +25,23 @@ export function ProfileEditor({ content, onDone }: EditorProps) {
       <TextField label="Location" value={draft.location} onChange={set('location')} />
       <TextField label="Tagline" rows={3} value={draft.tagline} onChange={set('tagline')} />
       <TextField label="Email" type="email" value={draft.email} onChange={set('email')} />
+
+      <div className="flex items-center gap-4">
+        {draft.headshot && (
+          <img src={draft.headshot} alt="" className="size-16 shrink-0 rounded-full object-cover ring-1 ring-border" />
+        )}
+        <div className="flex-1">
+          <UploadField
+            label="Upload a new headshot"
+            accept="image/jpeg,image/png,image/webp,image/avif"
+            hint="It goes live when you save."
+            onUpload={async ([file]) => set('headshot')(await uploadFile('headshot', file))}
+          />
+        </div>
+      </div>
       <OptionalTextField
         label="Headshot"
-        hint="The image's path, e.g. /headshot.jpg. Leave empty for none."
+        hint="The image's path. Leave empty for none."
         value={draft.headshot}
         onChange={set('headshot')}
       />

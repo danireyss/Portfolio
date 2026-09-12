@@ -72,7 +72,7 @@ describe('photos', () => {
     mockApi({
       '/api/site': site,
       '/api/projects': projects,
-      '/api/photos': { galleries: [{ title: 'Empty', description: null, photos: [] }] },
+      '/api/photos': { galleries: [{ folder: 'empty', title: 'Empty', description: null, photos: [] }] },
     })
     renderApp('/')
 

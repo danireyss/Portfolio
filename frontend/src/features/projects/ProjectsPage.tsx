@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useSearchParams } from 'react-router'
 import { useProjects } from '@/api/queries'
 import type { ProjectsResponse } from '@/api/types/ProjectsResponse'
+import { AdminEdit } from '@/components/AdminEdit'
 import { PageMeta } from '@/components/PageMeta'
 import { QueryState } from '@/components/QueryState'
 import { EASE_OUT } from '@/lib/motion'
@@ -30,7 +31,10 @@ function ProjectList({ data }: { data: ProjectsResponse }) {
       <PageMeta title="Projects" description="Things I've designed and built." />
       <header className="py-16 md:py-20">
         <p className="eyebrow">Work</p>
-        <h1 className="mt-2 text-5xl">Projects</h1>
+        <div className="mt-2 flex items-center gap-3">
+          <h1 className="text-5xl">Projects</h1>
+          <AdminEdit section="projects" />
+        </div>
         <p className="mt-4 max-w-2xl text-lg text-prose">
           Things I've designed and built. Filter by technology to see where I've used it.
         </p>

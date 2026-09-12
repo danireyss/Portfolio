@@ -54,6 +54,7 @@ fn build_gallery(config: &GalleryConfig, files: &[String]) -> Gallery {
         })
         .collect();
     Gallery {
+        folder: config.folder.clone(),
         title: config.title.clone(),
         description: config.description.clone(),
         photos,

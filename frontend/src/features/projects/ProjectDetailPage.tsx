@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowUpRight } from 'lucide-react'
 import { Link, useParams } from 'react-router'
 import { useProject } from '@/api/queries'
 import type { Project } from '@/api/types/Project'
+import { AdminEdit } from '@/components/AdminEdit'
 import { NotFound } from '@/components/NotFound'
 import { PageMeta } from '@/components/PageMeta'
 import { QueryState } from '@/components/QueryState'
@@ -47,7 +48,10 @@ function ProjectArticle({ project }: { project: Project }) {
           {project.category}
           {project.date && ` · ${project.date}`}
         </p>
-        <h1 className="mt-2 text-4xl md:text-5xl">{project.title}</h1>
+        <div className="mt-2 flex items-center gap-3">
+          <h1 className="text-4xl md:text-5xl">{project.title}</h1>
+          <AdminEdit section="project" target={project.slug} label={project.title} />
+        </div>
         <p className="mt-4 text-lg text-prose">{project.summary}</p>
         {project.tags.length > 0 && (
           <ul className="mt-6 flex flex-wrap gap-1.5" aria-label="Tech stack">

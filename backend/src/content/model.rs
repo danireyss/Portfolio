@@ -160,6 +160,8 @@ pub struct PhotoDetails {
 #[derive(Debug, Clone, Serialize, TS)]
 #[ts(export)]
 pub struct Gallery {
+    /// Its folder under `photos/`; admin finds the gallery by it.
+    pub folder: String,
     pub title: String,
     pub description: Option<String>,
     pub photos: Vec<Photo>,
