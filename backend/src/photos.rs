@@ -21,6 +21,9 @@ pub struct PhotoStoreError(pub String);
 pub trait PhotoStore: Send + Sync {
     /// Image file names directly inside `photos/<folder>/`, sorted by name.
     async fn list(&self, folder: &str) -> Result<Vec<String>, PhotoStoreError>;
+
+    /// Forgets any cached listings, after admin adds or removes photos.
+    fn invalidate(&self) {}
 }
 
 /// Image files only, skipping dotfiles like `.DS_Store` and macOS `._` copies.
@@ -120,6 +123,13 @@ impl<S: PhotoStore> PhotoStore for CachedPhotoStore<S> {
             .insert(folder.to_owned(), (Instant::now(), names.clone()));
         Ok(names)
     }
+
+    fn invalidate(&self) {
+        self.listings
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
+    }
 }
 
 /// For local development: lists `<root>/<folder>/`.
@@ -207,6 +217,10 @@ mod tests {
         expiring.list("trip").await.unwrap();
         expiring.list("trip").await.unwrap();
         assert_eq!(calls(&expiring), 2, "expired listings are fetched again");
+
+        cached.invalidate();
+        cached.list("trip").await.unwrap();
+        assert_eq!(calls(&cached), 3, "invalidate forgets cached listings");
     }
 
     #[tokio::test]

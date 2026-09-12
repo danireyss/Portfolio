@@ -11,5 +11,8 @@ infra/cdk.out/
 # and uploaded with `make upload-photos`.
 frontend/public/photos/
 
+# Headshots uploaded through admin during `make dev`; in production they're in the media bucket.
+frontend/public/uploads/
+
 # Benchmark output from scripts/bench.sh.
 bench/results/

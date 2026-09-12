@@ -113,6 +113,7 @@ async fn main() -> Result<(), Error> {
         content: Arc::new(ContentHandle::fixed(content)),
         mailer: Arc::new(LogMailer),
         photos: Arc::new(photos),
+        admin: None,
     });
     // Fill the photo cache and lazy statics first, as on a warm Lambda instance.
     for path in ENDPOINTS {

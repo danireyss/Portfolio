@@ -1,3 +1,4 @@
+mod admin;
 mod contact;
 mod content;
 mod photos;
@@ -23,5 +24,6 @@ pub(crate) fn router() -> Router<AppState> {
             "/contact",
             post(contact::send).layer(DefaultBodyLimit::max(16 * 1024)),
         )
+        .nest("/admin", admin::router())
         .fallback(|| async { AppError::NotFound })
 }

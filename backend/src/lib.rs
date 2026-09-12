@@ -1,3 +1,4 @@
+pub mod admin;
 pub mod content;
 pub mod email;
 mod error;
@@ -20,6 +21,8 @@ pub struct AppState {
     pub content: Arc<ContentHandle>,
     pub mailer: Arc<dyn Mailer>,
     pub photos: Arc<dyn PhotoStore>,
+    /// Owner-only editing; `None` turns every /api/admin route into a 404.
+    pub admin: Option<Arc<admin::Admin>>,
 }
 
 /// The whole API, served under `/api` both locally and behind CloudFront.

@@ -6,10 +6,11 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-/// `content/site.toml`.
-#[derive(Debug, Deserialize)]
+/// `content/site.toml`, which admin edits as a whole.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct SiteFile {
+#[ts(export)]
+pub struct SiteFile {
     pub profile: Profile,
     pub about: About,
     #[serde(default)]
@@ -133,8 +134,9 @@ pub struct Award {
 
 /// A `[[galleries]]` entry in site.toml. Its photos aren't listed here: they're whatever images
 /// are in `photos/<folder>/` in the media bucket, listed when /api/photos is requested.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
+#[ts(export)]
 pub struct GalleryConfig {
     /// Folder under `photos/`, e.g. "stealth-startup".
     pub folder: String,
@@ -145,8 +147,9 @@ pub struct GalleryConfig {
     pub photos: BTreeMap<String, PhotoDetails>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
+#[ts(export)]
 pub struct PhotoDetails {
     pub alt: Option<String>,
     pub caption: Option<String>,
@@ -175,9 +178,10 @@ pub struct Photo {
 }
 
 /// TOML front matter at the top of `content/projects/<slug>.md`.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct FrontMatter {
+#[ts(export)]
+pub struct FrontMatter {
     pub title: String,
     /// Short label above the title, e.g. "Full-stack" or "Game · Bevy".
     pub category: String,
@@ -225,6 +229,16 @@ pub struct Project {
     pub summary: ProjectSummary,
     /// The markdown body rendered to HTML.
     pub body_html: String,
+}
+
+/// A project file as admin edits it: the front matter and the Markdown below it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export)]
+pub struct ProjectSource {
+    /// The file name without `.md`.
+    pub slug: String,
+    pub front: FrontMatter,
+    pub markdown: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

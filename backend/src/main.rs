@@ -2,6 +2,10 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
+use portfolio_api::admin::{
+    Admin, BetterAuthSessions, CacheInvalidator, CloudFrontInvalidator, LocalMediaStore,
+    MediaStore, NoCdn, S3MediaStore,
+};
 use portfolio_api::content::{Content, ContentHandle, LocalContentStore, S3ContentStore};
 use portfolio_api::email::{LogMailer, Mailer, SesMailer};
 use portfolio_api::photos::{CachedPhotoStore, LocalPhotoStore, PhotoStore, S3PhotoStore};
@@ -52,10 +56,12 @@ async fn run(on_lambda: bool) -> Result<(), Error> {
             Arc::new(LocalPhotoStore::new(dir))
         }
     };
+    let admin = admin_from_env(&content).await?;
     let app = app(AppState {
         content,
         mailer,
         photos,
+        admin,
     });
 
     if on_lambda {
@@ -85,6 +91,47 @@ async fn load_content(on_lambda: bool) -> Result<ContentHandle, Error> {
     let local = LocalContentStore::from_env();
     tracing::info!(dir = %local.root().display(), "reading content from a local folder");
     Ok(ContentHandle::from_store(Arc::new(local), Duration::from_secs(1)).await?)
+}
+
+/// Admin is on when `ADMIN_EMAIL` (the only account let in) and `AUTH_URL` (the Better Auth
+/// service) are set, and content comes from a store it can save to.
+async fn admin_from_env(content: &ContentHandle) -> Result<Option<Arc<Admin>>, Error> {
+    let Ok(email) = std::env::var("ADMIN_EMAIL") else {
+        return Ok(None);
+    };
+    let Some(auth) = BetterAuthSessions::from_env()? else {
+        tracing::warn!("ADMIN_EMAIL is set but AUTH_URL isn't, so admin is off");
+        return Ok(None);
+    };
+    if content.store().is_none() {
+        tracing::warn!("admin is off: content is built into the binary, with nowhere to save it");
+        return Ok(None);
+    }
+    // Changes must come from the site itself (CSRF protection).
+    let origins = std::env::var("ADMIN_ORIGINS")
+        .unwrap_or_else(|_| "http://localhost:5173".into())
+        .split(',')
+        .map(|origin| origin.trim().to_owned())
+        .filter(|origin| !origin.is_empty())
+        .collect();
+    let media: Arc<dyn MediaStore> = match S3MediaStore::from_env().await {
+        Some(s3) => Arc::new(s3),
+        None => Arc::new(LocalMediaStore::from_env(
+            LocalContentStore::from_env().root(),
+        )),
+    };
+    let cdn: Arc<dyn CacheInvalidator> = match CloudFrontInvalidator::from_env().await {
+        Some(cloudfront) => Arc::new(cloudfront),
+        None => Arc::new(NoCdn),
+    };
+    tracing::info!("admin is on");
+    Ok(Some(Arc::new(Admin::new(
+        Arc::new(auth),
+        email,
+        origins,
+        media,
+        cdn,
+    ))))
 }
 
 /// Resolves on Ctrl+C or SIGTERM (`make dev` stops with either), so pending telemetry is

@@ -109,6 +109,7 @@ impl TestApp {
             content: Arc::new(ContentHandle::fixed(content)),
             mailer: mailer.clone(),
             photos: Arc::new(photos),
+            admin: None,
         });
         Self { router, mailer }
     }

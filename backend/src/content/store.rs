@@ -8,7 +8,7 @@ use std::fmt::Write as _;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
-use std::time::{Duration, Instant, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use aws_sdk_s3::error::DisplayErrorContext;
@@ -55,6 +55,12 @@ pub trait ContentStore: Send + Sync {
     async fn version(&self) -> Result<Option<String>, ContentStoreError>;
     /// All content files, or `None` when the store has no `site.toml` yet.
     async fn load(&self) -> Result<Option<ContentSources>, ContentStoreError>;
+    /// Writes a content file, e.g. "site.toml" or "projects/<slug>.md".
+    async fn put(&self, path: &str, bytes: Bytes) -> Result<(), ContentStoreError>;
+    /// Deletes a content file; one that doesn't exist is fine.
+    async fn delete(&self, path: &str) -> Result<(), ContentStoreError>;
+    /// Marks the content as changed after writes, so every instance's next check reloads it.
+    async fn touch_version(&self) -> Result<(), ContentStoreError>;
 }
 
 /// The content being served. Built from a store, it checks at most every `check_every` whether
@@ -107,6 +113,37 @@ impl ContentHandle {
                 }),
             }),
         })
+    }
+
+    /// Where the content comes from; `None` for fixed content.
+    pub fn store(&self) -> Option<&Arc<dyn ContentStore>> {
+        self.source.as_ref().map(|source| &source.store)
+    }
+
+    /// The store's version of the content being served: `None` for fixed content, and while an
+    /// empty store has the built-in content standing in.
+    pub fn version(&self) -> Option<String> {
+        let source = self.source.as_ref()?;
+        source
+            .state
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .version
+            .clone()
+    }
+
+    /// Loads the store's content now, whatever its version.
+    pub async fn reload(&self) -> Result<(), LoadError> {
+        let Some(source) = &self.source else {
+            return Ok(());
+        };
+        let version = source.store.version().await?;
+        let content = load_from(source.store.as_ref()).await?;
+        *self.current.write().unwrap_or_else(PoisonError::into_inner) = Arc::new(content);
+        let mut state = source.state.lock().unwrap_or_else(PoisonError::into_inner);
+        state.version = version;
+        state.checked = Instant::now();
+        Ok(())
     }
 
     /// The current content. When a check is due it also starts one in the background, whose
@@ -301,6 +338,36 @@ impl ContentStore for LocalContentStore {
             resume_pdf,
         }))
     }
+
+    async fn put(&self, path: &str, bytes: Bytes) -> Result<(), ContentStoreError> {
+        let target = self.root.join(path);
+        if let Some(dir) = target.parent() {
+            tokio::fs::create_dir_all(dir)
+                .await
+                .map_err(|e| io_error(dir, e))?;
+        }
+        // Write, then rename into place, so the reload check never reads half a file.
+        let temp = target.with_extension("saving");
+        tokio::fs::write(&temp, &bytes)
+            .await
+            .map_err(|e| io_error(&temp, e))?;
+        tokio::fs::rename(&temp, &target)
+            .await
+            .map_err(|e| io_error(&target, e))
+    }
+
+    async fn delete(&self, path: &str) -> Result<(), ContentStoreError> {
+        let target = self.root.join(path);
+        match tokio::fs::remove_file(&target).await {
+            Err(e) if e.kind() != ErrorKind::NotFound => Err(io_error(&target, e)),
+            _ => Ok(()),
+        }
+    }
+
+    /// The files' modification times already changed, which is what `version` reads.
+    async fn touch_version(&self) -> Result<(), ContentStoreError> {
+        Ok(())
+    }
 }
 
 const S3_PREFIX: &str = "content/";
@@ -442,6 +509,40 @@ impl ContentStore for S3ContentStore {
             resume_pdf,
         }))
     }
+
+    async fn put(&self, path: &str, bytes: Bytes) -> Result<(), ContentStoreError> {
+        let key = format!("{S3_PREFIX}{path}");
+        self.client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .body(bytes.into())
+            .send()
+            .await
+            .map_err(|e| s3_error(&key, &e))?;
+        Ok(())
+    }
+
+    async fn delete(&self, path: &str) -> Result<(), ContentStoreError> {
+        let key = format!("{S3_PREFIX}{path}");
+        self.client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(&key)
+            .send()
+            .await
+            .map_err(|e| s3_error(&key, &e))?;
+        Ok(())
+    }
+
+    /// Rewrites `version` with the time; its new ETag is what `version()` reports.
+    async fn touch_version(&self) -> Result<(), ContentStoreError> {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos();
+        self.put("version", Bytes::from(stamp.to_string())).await
+    }
 }
 
 #[cfg(test)]
@@ -498,6 +599,33 @@ mod tests {
 
         async fn load(&self) -> Result<Option<ContentSources>, ContentStoreError> {
             Ok(self.sources.lock().unwrap().clone())
+        }
+
+        async fn put(&self, path: &str, bytes: Bytes) -> Result<(), ContentStoreError> {
+            let mut sources = self.sources.lock().unwrap();
+            let sources = sources.get_or_insert_with(ContentSources::default);
+            let text = String::from_utf8_lossy(&bytes).into_owned();
+            match path {
+                "site.toml" => sources.site_toml = text,
+                "resume.pdf" => sources.resume_pdf = Some(bytes),
+                _ => {
+                    sources.projects.retain(|(p, _)| p != path);
+                    sources.projects.push((path.to_owned(), text));
+                }
+            }
+            Ok(())
+        }
+
+        async fn delete(&self, path: &str) -> Result<(), ContentStoreError> {
+            if let Some(sources) = self.sources.lock().unwrap().as_mut() {
+                sources.projects.retain(|(p, _)| p != path);
+            }
+            Ok(())
+        }
+
+        async fn touch_version(&self) -> Result<(), ContentStoreError> {
+            *self.version.lock().unwrap() += 1;
+            Ok(())
         }
     }
 

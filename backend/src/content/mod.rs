@@ -6,9 +6,9 @@ mod model;
 mod store;
 
 pub use model::{
-    About, Award, Education, Experience, FocusArea, Gallery, GalleryConfig, Link, Photo,
-    PhotoDetails, Profile, Project, ProjectRef, ProjectSummary, SkillGroup, Social, SocialKind,
-    Tag,
+    About, Award, Education, Experience, FocusArea, FrontMatter, Gallery, GalleryConfig, Link,
+    Photo, PhotoDetails, Profile, Project, ProjectRef, ProjectSource, ProjectSummary, SiteFile,
+    SkillGroup, Social, SocialKind, Tag,
 };
 pub use store::{
     ContentHandle, ContentSources, ContentStore, ContentStoreError, LoadError, LocalContentStore,
@@ -21,7 +21,6 @@ use std::path::Path;
 
 use bytes::Bytes;
 use include_dir::{Dir, File, include_dir};
-use model::{FrontMatter, SiteFile};
 use pulldown_cmark::{Options, Parser, html};
 
 static CONTENT_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../content");
@@ -51,8 +50,12 @@ pub struct Content {
     site: SiteFile,
     /// Sorted by front matter `order`, then title.
     projects: Vec<Project>,
+    /// The same projects, in the same order, as admin edits them.
+    project_sources: Vec<ProjectSource>,
     tags: Vec<Tag>,
     resume_pdf: Option<Bytes>,
+    /// The files this was parsed from, so admin can replace one and reuse the rest.
+    sources: ContentSources,
 }
 
 impl Content {
@@ -98,19 +101,32 @@ impl Content {
             .iter()
             .map(|(path, src)| parse_project(path, src))
             .collect::<Result<Vec<_>, _>>()?;
-        projects.sort_by(|(a_order, a), (b_order, b)| {
+        projects.sort_by(|(a_order, a, _), (b_order, b, _)| {
             a_order
                 .cmp(b_order)
                 .then_with(|| a.summary.title.cmp(&b.summary.title))
         });
-        let projects: Vec<Project> = projects.into_iter().map(|(_, project)| project).collect();
+        let (projects, project_sources): (Vec<Project>, Vec<ProjectSource>) = projects
+            .into_iter()
+            .map(|(_, project, source)| (project, source))
+            .unzip();
         let tags = collect_tags(&projects);
+        let sources = ContentSources {
+            site_toml: site_toml.to_owned(),
+            projects: project_files
+                .iter()
+                .map(|(path, text)| (path.clone(), (*text).to_owned()))
+                .collect(),
+            resume_pdf: resume_pdf.clone(),
+        };
 
         Ok(Self {
             site,
             projects,
+            project_sources,
             tags,
             resume_pdf,
+            sources,
         })
     }
 
@@ -168,6 +184,31 @@ impl Content {
     pub fn resume_pdf(&self) -> Option<&Bytes> {
         self.resume_pdf.as_ref()
     }
+
+    /// Everything in site.toml, as admin edits it.
+    pub fn site_file(&self) -> &SiteFile {
+        &self.site
+    }
+
+    /// The projects' front matter and Markdown, in the same order as [`Content::projects`].
+    pub fn project_sources(&self) -> &[ProjectSource] {
+        &self.project_sources
+    }
+
+    /// The files this content was parsed from.
+    pub fn sources(&self) -> &ContentSources {
+        &self.sources
+    }
+}
+
+/// The text of `site.toml` for `site`. Comments in the original file aren't kept.
+pub fn site_toml(site: &SiteFile) -> Result<String, toml::ser::Error> {
+    toml::to_string_pretty(site)
+}
+
+/// The text of a project file: TOML front matter between `+++` lines, then the Markdown.
+pub fn project_file(front: &FrontMatter, markdown: &str) -> Result<String, toml::ser::Error> {
+    Ok(format!("+++\n{}+++\n{markdown}", toml::to_string(front)?))
 }
 
 fn utf8(file: &'static File<'static>) -> Result<&'static str, ContentError> {
@@ -177,14 +218,14 @@ fn utf8(file: &'static File<'static>) -> Result<&'static str, ContentError> {
 }
 
 /// Lowercase letters, digits, and `-`: safe in URLs, S3 keys, and file paths.
-fn is_slug(s: &str) -> bool {
+pub(crate) fn is_slug(s: &str) -> bool {
     !s.is_empty()
         && s.bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
-/// Returns the project and its sort key.
-fn parse_project(path: &str, src: &str) -> Result<(i32, Project), ContentError> {
+/// Returns the project's sort key, the project, and its source for admin.
+fn parse_project(path: &str, src: &str) -> Result<(i32, Project, ProjectSource), ContentError> {
     let slug = Path::new(path)
         .file_stem()
         .and_then(|stem| stem.to_str())
@@ -200,6 +241,12 @@ fn parse_project(path: &str, src: &str) -> Result<(i32, Project), ContentError> 
         source,
     })?;
 
+    let source = ProjectSource {
+        slug: slug.into(),
+        front: meta.clone(),
+        markdown: body.to_owned(),
+    };
+    let order = meta.order;
     let project = Project {
         summary: ProjectSummary {
             slug: slug.into(),
@@ -214,7 +261,7 @@ fn parse_project(path: &str, src: &str) -> Result<(i32, Project), ContentError> 
         },
         body_html: markdown_to_html(body),
     };
-    Ok((meta.order, project))
+    Ok((order, project, source))
 }
 
 /// Splits `+++\n<toml>\n+++\n<markdown>` into its front matter and body.
@@ -328,13 +375,45 @@ mod tests {
             .into_iter()
             .chain(project_images);
         for src in srcs {
-            if let Some(path) = src.strip_prefix('/') {
+            // Headshots uploaded through admin live in the media bucket (`/uploads/…`), not git.
+            if let Some(path) = src.strip_prefix('/')
+                && !path.starts_with("uploads/")
+            {
                 assert!(
                     public.join(path).is_file(),
                     "`{src}` isn't in frontend/public/"
                 );
             }
         }
+    }
+
+    #[test]
+    fn content_survives_being_saved_by_admin() {
+        let content = Content::load_embedded().unwrap();
+        let site = site_toml(content.site_file()).unwrap();
+        let projects: Vec<(String, String)> = content
+            .project_sources()
+            .iter()
+            .map(|p| {
+                let file = project_file(&p.front, &p.markdown).unwrap();
+                (format!("projects/{}.md", p.slug), file)
+            })
+            .collect();
+        let files: Vec<(String, &str)> = projects
+            .iter()
+            .map(|(path, text)| (path.clone(), text.as_str()))
+            .collect();
+        let saved = Content::from_sources(&site, &files, None).unwrap_or_else(|e| panic!("{e}"));
+
+        fn json(value: impl serde::Serialize) -> serde_json::Value {
+            serde_json::to_value(value).unwrap()
+        }
+        assert_eq!(json(saved.site_file()), json(content.site_file()));
+        assert_eq!(
+            json(saved.project_sources()),
+            json(content.project_sources())
+        );
+        assert_eq!(json(saved.projects()), json(content.projects()));
     }
 
     #[test]
