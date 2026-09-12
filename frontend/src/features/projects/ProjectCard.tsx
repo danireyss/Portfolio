@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
 import type { ProjectSummary } from '@/api/types/ProjectSummary'
+import { TechIcon } from '@/components/TechIcon'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -22,7 +23,10 @@ export function ProjectCard({ project }: { project: ProjectSummary }) {
           <ul className="flex flex-wrap gap-1.5" aria-label="Tags">
             {project.tags.map((tag) => (
               <li key={tag}>
-                <Badge variant="secondary">{tag}</Badge>
+                <Badge variant="secondary">
+                  <TechIcon name={tag} data-icon="inline-start" />
+                  {tag}
+                </Badge>
               </li>
             ))}
           </ul>
