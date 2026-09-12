@@ -389,6 +389,10 @@ mod tests {
 
     #[test]
     fn content_survives_being_saved_by_admin() {
+        fn json(value: impl serde::Serialize) -> serde_json::Value {
+            serde_json::to_value(value).unwrap()
+        }
+
         let content = Content::load_embedded().unwrap();
         let site = site_toml(content.site_file()).unwrap();
         let projects: Vec<(String, String)> = content
@@ -405,9 +409,6 @@ mod tests {
             .collect();
         let saved = Content::from_sources(&site, &files, None).unwrap_or_else(|e| panic!("{e}"));
 
-        fn json(value: impl serde::Serialize) -> serde_json::Value {
-            serde_json::to_value(value).unwrap()
-        }
         assert_eq!(json(saved.site_file()), json(content.site_file()));
         assert_eq!(
             json(saved.project_sources()),

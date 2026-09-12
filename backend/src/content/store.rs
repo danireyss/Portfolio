@@ -8,8 +8,8 @@ use std::fmt::Write as _;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex, PoisonError, RwLock};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use async_trait::async_trait;
 use aws_sdk_s3::error::DisplayErrorContext;
@@ -18,6 +18,7 @@ use futures::future::try_join_all;
 
 use super::{Content, ContentError};
 use crate::aws::Aws;
+use crate::sync::{MutexExt, RwLockExt};
 
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
@@ -48,6 +49,18 @@ impl ContentSources {
             .map(|(path, text)| (path.clone(), text.as_str()))
             .collect();
         Content::from_sources(&self.site_toml, &projects, self.resume_pdf.clone())
+    }
+
+    /// Every file with its path, in the order to write them: `site.toml`, the projects, and the
+    /// resume if there is one.
+    pub fn files(&self) -> impl Iterator<Item = (&str, Bytes)> {
+        let site = ("site.toml", Bytes::from(self.site_toml.clone()));
+        let projects = self
+            .projects
+            .iter()
+            .map(|(path, text)| (path.as_str(), Bytes::from(text.clone())));
+        let resume = self.resume_pdf.clone().map(|pdf| ("resume.pdf", pdf));
+        std::iter::once(site).chain(projects).chain(resume)
     }
 }
 
@@ -84,6 +97,12 @@ struct SourceState {
     version: Option<String>,
     checked: Instant,
     checking: bool,
+}
+
+impl Source {
+    fn state(&self) -> MutexGuard<'_, SourceState> {
+        self.state.lock_ignoring_poison()
+    }
 }
 
 impl ContentHandle {
@@ -125,13 +144,7 @@ impl ContentHandle {
     /// The store's version of the content being served: `None` for fixed content, and while an
     /// empty store has the built-in content standing in.
     pub fn version(&self) -> Option<String> {
-        let source = self.source.as_ref()?;
-        source
-            .state
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .version
-            .clone()
+        self.source.as_ref()?.state().version.clone()
     }
 
     /// A short, header- and URL-safe tag for [`ContentHandle::version`]: what admin sends back
@@ -152,10 +165,8 @@ impl ContentHandle {
         };
         let version = source.store.version().await?;
         let content = load_from(source.store.as_ref()).await?;
-        *self.current.write().unwrap_or_else(PoisonError::into_inner) = Arc::new(content);
-        let mut state = source.state.lock().unwrap_or_else(PoisonError::into_inner);
-        state.version = version;
-        state.checked = Instant::now();
+        self.swap_in(source, content, version);
+        source.state().checked = Instant::now();
         Ok(())
     }
 
@@ -168,7 +179,7 @@ impl ContentHandle {
                 this.refresh().await;
             });
         }
-        Arc::clone(&self.current.read().unwrap_or_else(PoisonError::into_inner))
+        Arc::clone(&self.current.read_ignoring_poison())
     }
 
     /// Reloads if the store's version has changed; returns whether it did.
@@ -178,7 +189,7 @@ impl ContentHandle {
         };
         let result = self.try_refresh(source).await;
         {
-            let mut state = source.state.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut state = source.state();
             state.checking = false;
             state.checked = Instant::now();
         }
@@ -192,7 +203,7 @@ impl ContentHandle {
         let Some(source) = &self.source else {
             return false;
         };
-        let mut state = source.state.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut state = source.state();
         if state.checking || state.checked.elapsed() < source.check_every {
             return false;
         }
@@ -202,24 +213,19 @@ impl ContentHandle {
 
     async fn try_refresh(&self, source: &Source) -> Result<bool, LoadError> {
         let latest = source.store.version().await?;
-        let current = source
-            .state
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .version
-            .clone();
-        if latest == current {
+        if latest == self.version() {
             return Ok(false);
         }
         let content = load_from(source.store.as_ref()).await?;
-        *self.current.write().unwrap_or_else(PoisonError::into_inner) = Arc::new(content);
-        source
-            .state
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .version = latest;
+        self.swap_in(source, content, latest);
         tracing::info!("loaded new content");
         Ok(true)
+    }
+
+    /// Serves `content`, which the store had at `version`.
+    fn swap_in(&self, source: &Source, content: Content, version: Option<String>) {
+        *self.current.write_ignoring_poison() = Arc::new(content);
+        source.state().version = version;
     }
 }
 
@@ -385,6 +391,11 @@ impl ContentStore for LocalContentStore {
 
 const S3_PREFIX: &str = "content/";
 
+/// The key of a content file in the bucket: "site.toml" -> "content/site.toml".
+fn s3_key(path: &str) -> String {
+    format!("{S3_PREFIX}{path}")
+}
+
 /// `content/` in the media bucket, laid out like the repo's folder, plus a `version` object that
 /// every save rewrites so other instances notice.
 pub struct S3ContentStore {
@@ -448,7 +459,7 @@ impl S3ContentStore {
 
     /// `content/projects/*.md`, sorted.
     async fn project_keys(&self) -> Result<Vec<String>, ContentStoreError> {
-        let prefix = format!("{S3_PREFIX}projects/");
+        let prefix = s3_key("projects/");
         let mut pages = self
             .client
             .list_objects_v2()
@@ -493,15 +504,15 @@ fn s3_error<E: std::error::Error>(key: &str, e: &E) -> ContentStoreError {
 impl ContentStore for S3ContentStore {
     async fn version(&self) -> Result<Option<String>, ContentStoreError> {
         // Saves rewrite `version`; a bucket seeded by hand may only have site.toml.
-        match self.etag(&format!("{S3_PREFIX}version")).await? {
+        match self.etag(&s3_key("version")).await? {
             Some(etag) => Ok(Some(etag)),
-            None => self.etag(&format!("{S3_PREFIX}site.toml")).await,
+            None => self.etag(&s3_key("site.toml")).await,
         }
     }
 
     async fn load(&self) -> Result<Option<ContentSources>, ContentStoreError> {
-        let site_key = format!("{S3_PREFIX}site.toml");
-        let resume_key = format!("{S3_PREFIX}resume.pdf");
+        let site_key = s3_key("site.toml");
+        let resume_key = s3_key("resume.pdf");
         let (site, keys, resume_pdf) = tokio::try_join!(
             self.get(&site_key),
             self.project_keys(),
@@ -523,7 +534,7 @@ impl ContentStore for S3ContentStore {
     }
 
     async fn put(&self, path: &str, bytes: Bytes) -> Result<(), ContentStoreError> {
-        let key = format!("{S3_PREFIX}{path}");
+        let key = s3_key(path);
         self.client
             .put_object()
             .bucket(&self.bucket)
@@ -536,7 +547,7 @@ impl ContentStore for S3ContentStore {
     }
 
     async fn delete(&self, path: &str) -> Result<(), ContentStoreError> {
-        let key = format!("{S3_PREFIX}{path}");
+        let key = s3_key(path);
         self.client
             .delete_object()
             .bucket(&self.bucket)
@@ -549,10 +560,7 @@ impl ContentStore for S3ContentStore {
 
     /// Rewrites `version` with the time; its new ETag is what `version()` reports.
     async fn touch_version(&self) -> Result<(), ContentStoreError> {
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_nanos();
+        let stamp = crate::since_unix_epoch().as_nanos();
         self.put("version", Bytes::from(stamp.to_string())).await
     }
 }
@@ -689,6 +697,26 @@ mod tests {
         assert_eq!(tagline(&handle), "First", "this request doesn't wait");
         tokio::time::sleep(Duration::from_millis(20)).await;
         assert_eq!(tagline(&handle), "Second");
+    }
+
+    #[test]
+    fn files_lists_site_projects_then_resume() {
+        let sources = ContentSources {
+            site_toml: "site".into(),
+            projects: vec![("projects/a.md".into(), "a".into())],
+            resume_pdf: Some(Bytes::from_static(b"pdf")),
+        };
+        let files: Vec<_> = sources.files().collect();
+        assert_eq!(
+            files,
+            [
+                ("site.toml", Bytes::from("site")),
+                ("projects/a.md", Bytes::from("a")),
+                ("resume.pdf", Bytes::from("pdf")),
+            ]
+        );
+        let no_resume = ContentSources::default();
+        assert_eq!(no_resume.files().count(), 1, "just site.toml");
     }
 
     #[tokio::test]

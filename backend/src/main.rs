@@ -127,31 +127,44 @@ async fn admin_from_env(content: &ContentHandle, aws: &Aws) -> Option<Arc<Admin>
         tracing::warn!("admin is off: content is built into the binary, with nowhere to save it");
         return None;
     }
-    // Changes must come from the site itself (CSRF protection).
-    let origins = std::env::var("ADMIN_ORIGINS")
+    let admin = Admin::new(
+        Arc::new(auth),
+        email,
+        admin_origins(),
+        media_store(aws).await,
+        cache_invalidator(aws),
+    );
+    tracing::info!("admin is on");
+    Some(Arc::new(admin))
+}
+
+/// Where admin changes may come from (CSRF protection): the comma-separated `ADMIN_ORIGINS`, or
+/// the Vite dev server.
+fn admin_origins() -> Vec<String> {
+    std::env::var("ADMIN_ORIGINS")
         .unwrap_or_else(|_| "http://localhost:5173".into())
         .split(',')
         .map(|origin| origin.trim().to_owned())
         .filter(|origin| !origin.is_empty())
-        .collect();
-    let media: Arc<dyn MediaStore> = match S3MediaStore::from_env(aws).await {
+        .collect()
+}
+
+/// Uploads go to the media bucket when `MEDIA_BUCKET` is set, and into the repo otherwise.
+async fn media_store(aws: &Aws) -> Arc<dyn MediaStore> {
+    match S3MediaStore::from_env(aws).await {
         Some(s3) => Arc::new(s3),
         None => Arc::new(LocalMediaStore::from_env(
             LocalContentStore::from_env().root(),
         )),
-    };
-    let cdn: Arc<dyn CacheInvalidator> = match CloudFrontInvalidator::from_env(aws) {
+    }
+}
+
+/// CloudFront when `DISTRIBUTION_ID` is set; locally nothing caches the API.
+fn cache_invalidator(aws: &Aws) -> Arc<dyn CacheInvalidator> {
+    match CloudFrontInvalidator::from_env(aws) {
         Some(cloudfront) => Arc::new(cloudfront),
         None => Arc::new(NoCdn),
-    };
-    tracing::info!("admin is on");
-    Some(Arc::new(Admin::new(
-        Arc::new(auth),
-        email,
-        origins,
-        media,
-        cdn,
-    )))
+    }
 }
 
 /// Resolves on Ctrl+C or SIGTERM (`make dev` stops with either), so pending telemetry is

@@ -64,12 +64,11 @@ export function ProjectForm({
     structuredClone(source ?? blankProject(content.projects.length)),
   )
   const [slugEdited, setSlugEdited] = useState(false)
-  const [preview, setPreview] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const saveProject = useSaveProject()
   const deleteProject = useDeleteProject()
   const front = draft.front
-  const setFront = (next: Partial<FrontMatter>) => setDraft({ ...draft, front: { ...front, ...next } })
+  const setFront = (next: Partial<FrontMatter>) =>
+    setDraft((current) => ({ ...current, front: { ...current.front, ...next } }))
 
   const save = async () => {
     if (!SLUG.test(draft.slug)) {
@@ -97,30 +96,24 @@ export function ProjectForm({
     }
   }
 
-  const deleteButtons = isNew ? null : confirmingDelete ? (
-    <div className="flex items-center gap-1">
-      <Button type="button" variant="destructive" onClick={remove} disabled={deleteProject.isPending}>
-        Delete for good
-      </Button>
-      <Button type="button" variant="ghost" onClick={() => setConfirmingDelete(false)}>
-        Keep
-      </Button>
-    </div>
-  ) : (
-    <Button type="button" variant="ghost" className="text-destructive" onClick={() => setConfirmingDelete(true)}>
-      Delete
-    </Button>
-  )
-
   return (
-    <EditorForm save={save} pending={saveProject.isPending} onDone={onDone} extra={deleteButtons}>
+    <EditorForm
+      save={save}
+      pending={saveProject.isPending}
+      onDone={onDone}
+      extra={isNew ? null : <DeleteButton onDelete={remove} pending={deleteProject.isPending} />}
+    >
       <TextField
         label="Title"
         value={front.title}
-        onChange={(title) => {
-          setFront({ title })
-          if (isNew && !slugEdited) setDraft((current) => ({ ...current, slug: slugify(title), front: { ...current.front, title } }))
-        }}
+        onChange={(title) =>
+          setDraft((current) => ({
+            ...current,
+            // A new project's URL name follows its title until it's typed in by hand.
+            slug: isNew && !slugEdited ? slugify(title) : current.slug,
+            front: { ...current.front, title },
+          }))
+        }
       />
       {isNew && (
         <TextField
@@ -129,7 +122,7 @@ export function ProjectForm({
           value={draft.slug}
           onChange={(slug) => {
             setSlugEdited(true)
-            setDraft({ ...draft, slug })
+            setDraft((current) => ({ ...current, slug }))
           }}
         />
       )}
@@ -171,26 +164,37 @@ export function ProjectForm({
       />
       <MarkdownField
         value={draft.markdown}
-        onChange={(markdown) => setDraft({ ...draft, markdown })}
-        preview={preview}
-        onPreviewChange={setPreview}
+        onChange={(markdown) => setDraft((current) => ({ ...current, markdown }))}
       />
     </EditorForm>
   )
 }
 
+/** Delete, which asks for a second click before it deletes anything. */
+function DeleteButton({ onDelete, pending }: { onDelete: () => void; pending: boolean }) {
+  const [confirming, setConfirming] = useState(false)
+  if (!confirming) {
+    return (
+      <Button type="button" variant="ghost" className="text-destructive" onClick={() => setConfirming(true)}>
+        Delete
+      </Button>
+    )
+  }
+  return (
+    <div className="flex items-center gap-1">
+      <Button type="button" variant="destructive" onClick={onDelete} disabled={pending}>
+        Delete for good
+      </Button>
+      <Button type="button" variant="ghost" onClick={() => setConfirming(false)}>
+        Keep
+      </Button>
+    </div>
+  )
+}
+
 /** The write-up, in Markdown, with a preview close to how the page renders it. */
-function MarkdownField({
-  value,
-  onChange,
-  preview,
-  onPreviewChange,
-}: {
-  value: string
-  onChange: (value: string) => void
-  preview: boolean
-  onPreviewChange: (preview: boolean) => void
-}) {
+function MarkdownField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [preview, setPreview] = useState(false)
   // Your own Markdown, shown only to you.
   const html = useMemo(() => (preview ? (marked.parse(value, { async: false }) as string) : ''), [preview, value])
   const tab = (active: boolean) =>
@@ -201,10 +205,10 @@ function MarkdownField({
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{preview ? 'Preview' : ''}</span>
         <div className="flex gap-1" role="group" aria-label="Write-up view">
-          <button type="button" className={tab(!preview)} aria-pressed={!preview} onClick={() => onPreviewChange(false)}>
+          <button type="button" className={tab(!preview)} aria-pressed={!preview} onClick={() => setPreview(false)}>
             Write
           </button>
-          <button type="button" className={tab(preview)} aria-pressed={preview} onClick={() => onPreviewChange(true)}>
+          <button type="button" className={tab(preview)} aria-pressed={preview} onClick={() => setPreview(true)}>
             Preview
           </button>
         </div>

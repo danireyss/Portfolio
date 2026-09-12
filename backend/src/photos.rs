@@ -5,13 +5,14 @@
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::path::PathBuf;
-use std::sync::{Mutex, PoisonError};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use aws_sdk_s3::error::DisplayErrorContext;
 
 use crate::aws::Aws;
+use crate::sync::MutexExt;
 
 const IMAGE_EXTENSIONS: [&str; 6] = ["jpg", "jpeg", "png", "webp", "avif", "gif"];
 
@@ -108,8 +109,7 @@ impl<S: PhotoStore> PhotoStore for CachedPhotoStore<S> {
         // The lock is released at the end of each statement, never held across an await.
         let cached = self
             .listings
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .lock_ignoring_poison()
             .get(folder)
             .filter(|(fetched, _)| fetched.elapsed() < self.ttl)
             .map(|(_, names)| names.clone());
@@ -119,17 +119,13 @@ impl<S: PhotoStore> PhotoStore for CachedPhotoStore<S> {
 
         let names = self.inner.list(folder).await?;
         self.listings
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
+            .lock_ignoring_poison()
             .insert(folder.to_owned(), (Instant::now(), names.clone()));
         Ok(names)
     }
 
     fn invalidate(&self) {
-        self.listings
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clear();
+        self.listings.lock_ignoring_poison().clear();
     }
 }
 
