@@ -7,15 +7,18 @@ import { Cloud, Code, Layers, Server, type LucideIcon } from 'lucide-react'
 import type { SVGProps } from 'react'
 import {
   siCss,
+  siDocker,
   siFlask,
   siHtml5,
   siJavascript,
   siNextdotjs,
+  siPolars,
   siPostgresql,
   siPrisma,
   siPython,
   siReact,
   siRust,
+  siStreamlit,
   siTypescript,
   type SimpleIcon,
 } from 'simple-icons'
@@ -24,15 +27,18 @@ import { cn } from '@/lib/utils'
 // Keyed by the lowercased tag, as written in the projects' front matter.
 const BRANDS: Record<string, SimpleIcon> = {
   css: siCss,
+  docker: siDocker,
   flask: siFlask,
   html: siHtml5,
   javascript: siJavascript,
   'next.js': siNextdotjs,
+  polars: siPolars,
   postgresql: siPostgresql,
   prisma: siPrisma,
   python: siPython,
   react: siReact,
   rust: siRust,
+  streamlit: siStreamlit,
   typescript: siTypescript,
 }
 
