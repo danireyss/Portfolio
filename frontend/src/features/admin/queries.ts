@@ -26,10 +26,8 @@ export function useAdminContent() {
   useEffect(() => {
     if (isNotFound(query.error)) setAdminMode(false)
   }, [query.error])
-  useEffect(() => {
-    // Show the latest content, not a cached copy.
-    if (query.data) setContentVersion(query.data.version)
-  }, [query.data])
+  // Pages keep reading through CloudFront's cache; only a save switches them to fresh reads
+  // (see `published`), so browsing in admin mode is as fast as for everyone else.
   return query
 }
 

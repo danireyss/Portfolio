@@ -10,6 +10,7 @@ import { ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion } from 'motion/react'
 import { useState, type KeyboardEvent } from 'react'
 import { Link } from 'react-router'
+import { usePrefetchPage } from '@/api/queries'
 import type { ProjectSummary } from '@/api/types/ProjectSummary'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,7 @@ type ProjectCoverFlowProps = {
 export function ProjectCoverFlow({ projects, className }: ProjectCoverFlowProps) {
   // Start in the middle, like the original, so cards fan out on both sides.
   const [active, setActive] = useState(Math.floor((projects.length - 1) / 2))
+  const prefetch = usePrefetchPage()
   const go = (index: number) => setActive(Math.min(projects.length - 1, Math.max(0, index)))
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -89,6 +91,9 @@ export function ProjectCoverFlow({ projects, className }: ProjectCoverFlowProps)
                   <Link
                     to={`/projects/${project.slug}`}
                     tabIndex={isActive ? 0 : -1}
+                    onMouseEnter={() => prefetch(`/projects/${project.slug}`)}
+                    onFocus={() => prefetch(`/projects/${project.slug}`)}
+                    onTouchStart={() => prefetch(`/projects/${project.slug}`)}
                     className="mt-5 inline-flex items-center gap-1 text-sm text-primary transition-colors hover:text-heading"
                   >
                     Details
