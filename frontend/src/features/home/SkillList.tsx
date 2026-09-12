@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import type { Tag } from '@/api/types/Tag'
+import { TechIcon } from '@/components/TechIcon'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 /** Each skill links to the projects filtered by it; hovering lists those projects. */
@@ -12,8 +13,9 @@ export function SkillList({ skills }: { skills: Tag[] }) {
             <TooltipTrigger asChild>
               <Link
                 to={`/projects?tag=${encodeURIComponent(skill.name)}`}
-                className="inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm transition-colors hover:border-gold-dim hover:text-heading"
+                className="group inline-flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5 text-sm transition-colors hover:border-gold-dim hover:text-heading"
               >
+                <TechIcon name={skill.name} className="text-muted-foreground transition-colors group-hover:text-primary" />
                 {skill.name}
                 <span className="font-mono text-xs text-primary">{skill.projects.length}</span>
               </Link>
