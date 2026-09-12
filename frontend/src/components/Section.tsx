@@ -9,9 +9,11 @@ type SectionProps = {
   title: ReactNode
   children: ReactNode
   className?: string
+  /** Shown beside the title, e.g. admin's edit button. */
+  action?: ReactNode
 }
 
-export function Section({ id, eyebrow, title, children, className }: SectionProps) {
+export function Section({ id, eyebrow, title, children, className, action }: SectionProps) {
   return (
     <section
       id={id}
@@ -20,9 +22,12 @@ export function Section({ id, eyebrow, title, children, className }: SectionProp
     >
       <Reveal>
         <p className="eyebrow">{eyebrow}</p>
-        <h2 id={`${id}-title`} className="mt-2 font-heading text-3xl text-heading md:text-4xl">
-          {title}
-        </h2>
+        <div className="mt-2 flex items-center gap-3">
+          <h2 id={`${id}-title`} className="font-heading text-3xl text-heading md:text-4xl">
+            {title}
+          </h2>
+          {action}
+        </div>
       </Reveal>
       <div className="mt-8">{children}</div>
     </section>

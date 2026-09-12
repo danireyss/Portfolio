@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { Suspense } from 'react'
 import { useLocation, useOutlet } from 'react-router'
+import { AdminBarSlot } from '@/components/AdminEdit'
 import { PageSkeleton } from '@/components/QueryState'
 import { EASE_OUT } from '@/lib/motion'
 import { Footer } from './Footer'
@@ -35,6 +36,7 @@ export function Layout() {
         </motion.main>
       </AnimatePresence>
       <Footer />
+      <AdminBarSlot />
     </div>
   )
 }

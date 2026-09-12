@@ -21,6 +21,7 @@ const ProjectDetailPage = lazyPage(
 const PhotosPage = lazyPage(() => import('@/features/photos/PhotosPage'), 'PhotosPage')
 const ResumePage = lazyPage(() => import('@/features/resume/ResumePage'), 'ResumePage')
 const ContactPage = lazyPage(() => import('@/features/contact/ContactPage'), 'ContactPage')
+const AdminPage = lazyPage(() => import('@/features/admin/AdminPage'), 'AdminPage')
 
 export function App() {
   return (
@@ -32,6 +33,8 @@ export function App() {
         <Route path="photos" element={<PhotosPage />} />
         <Route path="resume" element={<ResumePage />} />
         <Route path="contact" element={<ContactPage />} />
+        {/* Linked from nowhere; see features/admin. */}
+        <Route path="admin" element={<AdminPage />} />
         <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>

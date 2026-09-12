@@ -5,6 +5,7 @@
 //! - Neither, or a store with nothing in it yet: the copy built into the binary.
 
 use std::fmt::Write as _;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
@@ -130,6 +131,17 @@ impl ContentHandle {
             .unwrap_or_else(PoisonError::into_inner)
             .version
             .clone()
+    }
+
+    /// A short, header- and URL-safe tag for [`ContentHandle::version`]: what admin sends back
+    /// as `If-Match`, and what `?v=` asks for.
+    pub fn version_tag(&self) -> String {
+        let Some(version) = self.version() else {
+            return "built-in".into();
+        };
+        let mut hasher = DefaultHasher::new();
+        version.hash(&mut hasher);
+        format!("{:016x}", hasher.finish())
     }
 
     /// Loads the store's content now, whatever its version.

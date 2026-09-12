@@ -1,7 +1,6 @@
 //! `/api/admin/*`: owner-only editing. Every handler takes [`Owner`] first, so anyone else gets
 //! the same 404 as an unknown path before a body is even read.
 
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -128,20 +127,10 @@ fn invalid(error: impl std::fmt::Display) -> AppError {
     AppError::InvalidContent(error.to_string())
 }
 
-/// A short, header-safe tag for the store's current version.
-fn version_tag(state: &AppState) -> String {
-    let Some(version) = state.content.version() else {
-        return "built-in".into();
-    };
-    let mut hasher = DefaultHasher::new();
-    version.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
-
 fn document(state: &AppState) -> AdminContent {
     let content = state.content.get();
     AdminContent {
-        version: version_tag(state),
+        version: state.content.version_tag(),
         site: content.site_file().clone(),
         projects: content.project_sources().to_vec(),
         has_resume: content.resume_pdf().is_some(),
@@ -231,7 +220,7 @@ async fn save(
 
     state.content.refresh().await;
     if let Some(expected) = headers.get(IF_MATCH).and_then(|v| v.to_str().ok())
-        && expected != version_tag(state)
+        && expected != state.content.version_tag()
     {
         return Err(AppError::Conflict);
     }

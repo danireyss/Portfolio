@@ -27,8 +27,12 @@ pub struct AppState {
 
 /// The whole API, served under `/api` both locally and behind CloudFront.
 pub fn app(state: AppState) -> Router {
+    let api = routes::router().layer(axum::middleware::from_fn_with_state(
+        state.clone(),
+        routes::fresh_content,
+    ));
     Router::new()
-        .nest("/api", routes::router())
+        .nest("/api", api)
         .with_state(state)
         // Router::layer wraps each route, so both see the matched route template.
         .layer(axum::middleware::from_fn(telemetry::track_request))
