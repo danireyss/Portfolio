@@ -19,17 +19,24 @@
       } catch {}
     </script>
     <script>
-      // Every page needs /api/site, and it names the home page's largest image (the headshot):
-      // request both now instead of after the app's JavaScript has loaded. The app takes over the
-      // response in src/api/queries.ts (adoptEarlySite).
-      window.__site = fetch('/api/site', { headers: { Accept: 'application/json' } }).then((response) => {
-        if (!response.ok) throw new Error(`GET /api/site: ${response.status}`)
-        return response.json()
-      })
-      // The app handles a failure (it fetches again); this only keeps it out of the console.
-      window.__site.catch(() => {})
+      // Every page needs /api/site and /api/photos (the nav shows Photos only when there are
+      // photos), and /api/site names the home page's largest image, the headshot: request them
+      // now instead of after the app's JavaScript has loaded, so the first render already has
+      // them. The app takes the responses over in src/api/queries.ts (adoptEarlyData).
+      {
+        const get = (path) => {
+          const data = fetch(path, { headers: { Accept: 'application/json' } }).then((response) => {
+            if (!response.ok) throw new Error(`GET ${path}: ${response.status}`)
+            return response.json()
+          })
+          // The app handles a failure (it fetches again); this only keeps it out of the console.
+          data.catch(() => {})
+          return data
+        }
+        window.__early = { site: get('/api/site'), photos: get('/api/photos') }
+      }
       if (location.pathname === '/') {
-        window.__site.then((site) => {
+        window.__early.site.then((site) => {
           const headshot = site.profile && site.profile.headshot
           if (!headshot) return
           const link = document.createElement('link')

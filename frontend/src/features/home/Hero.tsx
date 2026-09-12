@@ -36,12 +36,9 @@ export function Hero({ profile }: { profile: Profile }) {
           </Button>
         </motion.div>
       </div>
-      {profile.headshot && (
-        // Scales in but isn't faded: it's the page's largest paint, so it shows the moment it loads.
-        <motion.div initial={{ scale: 0.96 }} animate={{ scale: 1 }} transition={{ duration: 0.4 }}>
-          <Headshot key={profile.headshot} src={profile.headshot} name={profile.name} />
-        </motion.div>
-      )}
+      {/* No animation of its own (the page's quick fade-in covers it): it's the largest paint, and
+          its own fade held that back by the fade's length. */}
+      {profile.headshot && <Headshot key={profile.headshot} src={profile.headshot} name={profile.name} />}
     </section>
   )
 }

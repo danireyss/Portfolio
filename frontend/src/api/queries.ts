@@ -10,20 +10,27 @@ import { api, isNotFound } from './client'
 
 declare global {
   interface Window {
-    /** /api/site, requested by index.html before the app's code loaded; see adoptEarlySite. */
-    __site?: Promise<Awaited<ReturnType<typeof api.site>>>
+    /** Requested by index.html before the app's code loaded; see adoptEarlyData. */
+    __early?: {
+      site: Promise<Awaited<ReturnType<typeof api.site>>>
+      photos: Promise<Awaited<ReturnType<typeof api.photos>>>
+    }
   }
 }
 
 /**
- * Hands index.html's early /api/site request to the site query, so the app doesn't fetch it
- * again and often has the data by its first render. If that request failed, fetches normally.
+ * Hands index.html's early requests to their queries, so the app doesn't fetch them again and
+ * usually has the data by its first render. A request that failed is fetched again normally.
  */
-export function adoptEarlySite(queryClient: QueryClient) {
-  const early = window.__site
+export function adoptEarlyData(queryClient: QueryClient) {
+  const early = window.__early
   if (!early) return
-  window.__site = undefined
-  void queryClient.prefetchQuery({ ...queries.site(), queryFn: () => early.catch(() => api.site()) })
+  window.__early = undefined
+  void queryClient.prefetchQuery({ ...queries.site(), queryFn: () => early.site.catch(() => api.site()) })
+  void queryClient.prefetchQuery({
+    ...queries.photos(),
+    queryFn: () => early.photos.catch(() => api.photos()),
+  })
 }
 
 export function createQueryClient() {
