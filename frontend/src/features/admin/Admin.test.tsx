@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { setContentVersion } from '@/api/client'
 import type { AdminContent } from '@/api/types/AdminContent'
 import type { ProjectSource } from '@/api/types/ProjectSource'
@@ -9,6 +9,12 @@ import { alphaDetail, photosResponse, projects, site } from '@/test/fixtures'
 import { jsonResponse, mockApi, renderApp } from '@/test/utils'
 
 vi.mock('@/lib/navigation', () => ({ goTo: vi.fn() }))
+
+// The admin UI is lazy-loaded; load it once up front so no test's waits include the first
+// import (slow on CI runners, where it can take longer than findBy*'s one-second default).
+beforeAll(async () => {
+  await Promise.all([import('@/features/admin/EditButton'), import('@/features/admin/AdminBar'), import('@/features/admin/AdminPage')])
+})
 
 const content: AdminContent = {
   version: 'v1',
