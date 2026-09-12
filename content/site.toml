@@ -14,24 +14,21 @@ email = "danieljreyes2001@gmail.com"
 headshot = "/headshot.jpg"
 
 [about]
-# DRAFT
 background = [
-  "I'm a Computer Science student at Florida International University, graduating in December 2026 with a 3.77 GPA.",
-  "This summer I interned at an AI start-up, where I moved an internal build-and-release tool onto ECS Fargate, replaced long-lived AWS credentials with Okta OIDC and short-lived scoped tokens, and built a Grafana-based observability platform with the AWS CDK. Before that, I was part of a six-person team that built a warehouse management system for Global Empowerment Mission, a nonprofit.",
+  "I'm a Computer Science student at Florida International University, graduating in December 2026.",
+  "I'm looking for entry-level software engineering roles. I like building complex systems that run at scale and perform well under load, and I'm especially interested in AI infrastructure, parallel programming, and GPU programming.",
+  "Outside of work, I play soccer, guitar, and video games — and I still write code for fun.",
 ]
-
-# DRAFT
+[[about.focus_areas]]
+title = "Backend development"
+description = "REST APIs and the data models behind them, structured to stay readable as they grow."
 [[about.focus_areas]]
 title = "Cloud infrastructure"
-description = "Scalable, secure AWS deployments defined as code: ECS Fargate, S3, ALB, and PrivateLink with the AWS CDK."
+description = "AWS deployments defined as code with the CDK, built to scale horizontally and stay locked down."
 
 [[about.focus_areas]]
-title = "Full-stack development"
-description = "Web apps end to end, from Next.js and React frontends to Flask REST APIs backed by PostgreSQL."
-
-[[about.focus_areas]]
-title = "Observability"
-description = "Metrics, logs, and traces with Grafana, Mimir, Loki, and Tempo, built to survive restarts and scaling."
+title = "Distributed systems"
+description = "Services that keep their data and stay fast through restarts, scaling, and load."
 
 # kind is one of: github, linkedin, email, website, x
 [[socials]]
@@ -100,13 +97,24 @@ skills = ["PostgreSQL", "MySQL"]
 
 [[skill_groups]]
 name = "Tools & Platforms"
-skills = ["AWS", "AWS CDK", "Docker", "Grafana", "Git", "Linux", "Neovim", "Tmux"]
+skills = [
+  "AWS",
+  "AWS CDK",
+  "Docker",
+  "Grafana",
+  "Git",
+  "Linux",
+  "Neovim",
+  "Tmux",
+]
 
 [[awards]]
 title = "Summit Impact Award"
 issuer = "FIU Knight Foundation School of Computing and Information Science"
 date = "Oct 2025"
-details = ["Recognized for delivering measurable impact through open-source contributions."]
+details = [
+  "Recognized for delivering measurable impact through open-source contributions.",
+]
 
 # Photo galleries, shown on /photos with Amicro's Time Machine stack, one stack per gallery.
 # A gallery's photos are whatever images are in photos/<folder>/ in the S3 media bucket: the
