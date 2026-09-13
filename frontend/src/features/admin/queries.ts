@@ -91,6 +91,9 @@ export const useUpload = () =>
     },
   )
 
+/** Reads the resume PDF into the resume page's sections. */
+export const useImportResume = () => useAdminChange<void>(() => adminApi.importResume())
+
 export const useDeletePhoto = () =>
   useAdminChange(async ({ folder, file }: { folder: string; file: string }) => {
     await adminApi.deletePhoto(folder, file)

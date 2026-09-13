@@ -3,6 +3,7 @@
 //! at compile time is the fallback when there's no store or it's still empty.
 
 mod model;
+mod resume_pdf;
 mod store;
 
 pub use model::{
@@ -10,6 +11,7 @@ pub use model::{
     Photo, PhotoDetails, Profile, Project, ProjectRef, ProjectSource, ProjectSummary, SiteFile,
     SkillGroup, Social, SocialKind, Tag,
 };
+pub use resume_pdf::{ResumePdfError, ResumeSections, read_resume};
 pub use store::{
     ContentHandle, ContentSources, ContentStore, ContentStoreError, LoadError, LocalContentStore,
     S3ContentStore,

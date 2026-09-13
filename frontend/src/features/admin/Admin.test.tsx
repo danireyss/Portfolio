@@ -194,6 +194,56 @@ describe('admin mode', () => {
     expect(calls(fetchMock, '/api/admin/photos/summer/one.jpg')[0][1]?.method).toBe('DELETE')
   })
 
+  it('uploads a resume, then reads the resume page from it', async () => {
+    turnOnAdminMode()
+    const withResume: AdminContent = { ...content, resume_url: '/api/resume.pdf?v=v1' }
+    const job = {
+      company: 'Acme',
+      company_url: null,
+      title: 'Engineer',
+      location: 'Remote',
+      start: 'Jan 2026',
+      end: null,
+      summary: null,
+      bullets: ['Built it'],
+    }
+    const fetchMock = mockApi({
+      '/api/site': site,
+      '/api/resume': {
+        profile: site.profile,
+        socials: site.socials,
+        experience: [],
+        education: [],
+        skill_groups: [],
+        awards: [],
+        pdf_url: '/api/resume.pdf?v=v1',
+      },
+      '/api/admin/content': withResume,
+      '/api/admin/uploads': {
+        url: '/upload-here',
+        headers: [['content-type', 'application/pdf']],
+        path: '/api/resume.pdf',
+      },
+      '/upload-here': () => new Response(null, { status: 200 }),
+      '/api/admin/reload': { ...withResume, version: 'v2' },
+      '/api/admin/resume/import': { ...withResume, version: 'v3', site: { ...content.site, experience: [job] } },
+    })
+    renderApp('/resume')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Edit resume PDF' }))
+    const panel = await screen.findByRole('dialog', { name: 'Edit resume PDF' })
+    await user.upload(
+      within(panel).getByLabelText('Upload a new resume'),
+      new File(['%PDF'], 'cv.pdf', { type: 'application/pdf' }),
+    )
+
+    await waitFor(() => expect(calls(fetchMock, '/api/admin/resume/import')).toHaveLength(1))
+    // The new PDF is published first, so the import reads it.
+    const paths = fetchMock.mock.calls.map(([url]) => String(url).split('?')[0])
+    expect(paths.indexOf('/api/admin/reload')).toBeLessThan(paths.indexOf('/api/admin/resume/import'))
+  })
+
   it('turns itself off when the admin API says no', async () => {
     turnOnAdminMode()
     mockApi({ '/api/site': site, '/api/projects': projects })

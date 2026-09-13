@@ -32,6 +32,8 @@ export const adminApi = {
     request<UploadTicket>('/admin/uploads', json('POST', upload)),
   /** After uploading photos or a resume, or deleting photos: serves what's in storage now. */
   reload: () => request<AdminContent>('/admin/reload', { method: 'POST' }),
+  /** Has the resume page's experience, education, skills, and awards match the resume PDF. */
+  importResume: () => request<AdminContent>('/admin/resume/import', { method: 'POST' }),
   deletePhoto: (folder: string, file: string) =>
     request<void>(`/admin/photos/${encodeURIComponent(folder)}/${encodeURIComponent(file)}`, {
       method: 'DELETE',
