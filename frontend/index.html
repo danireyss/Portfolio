@@ -1,20 +1,20 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0d0d0d" />
+    <meta name="theme-color" content="#f7f4ee" />
     <!-- The site has its own dark theme, so the Dark Reader extension shouldn't re-darken the
          light one (it turns the page olive and the photo stack purple). -->
     <meta name="darkreader-lock" />
     <script>
-      // Before first paint, so a visitor who picked light doesn't see a dark flash. Keep the key
+      // Before first paint, so a visitor who picked dark doesn't see a light flash. Keep the key
       // and color in sync with src/lib/theme.ts.
       try {
-        if (localStorage.getItem('theme') === 'light') {
-          document.documentElement.classList.remove('dark')
-          document.querySelector('meta[name="theme-color"]').content = '#f7f4ee'
+        if (localStorage.getItem('theme') === 'dark') {
+          document.documentElement.classList.add('dark')
+          document.querySelector('meta[name="theme-color"]').content = '#0d0d0d'
         }
       } catch {}
     </script>

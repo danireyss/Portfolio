@@ -7,9 +7,9 @@
 
 /*
  * The template's palette (peterpinto.dev) mapped onto shadcn's semantic tokens, so shadcn and
- * Amicro components share one theme. Dark is the default: index.html starts with class="dark",
- * which the nav's toggle removes (see src/lib/theme.ts). The light palette keeps the same warm
- * tones on paper, with a deeper gold so gold text stays readable.
+ * Amicro components share one theme. Light is the default: index.html starts without
+ * class="dark", which the nav's toggle adds (see src/lib/theme.ts). The light palette keeps the
+ * same warm tones on paper, with a deeper gold so gold text stays readable.
  */
 :root {
   color-scheme: light;
