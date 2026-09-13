@@ -9,4 +9,8 @@ export type AdminContent = {
 /**
  * Send back as `If-Match` when saving; a save based on older content is refused (409).
  */
-version: string, site: SiteFile, projects: Array<ProjectSource>, has_resume: boolean, };
+version: string, site: SiteFile, projects: Array<ProjectSource>, 
+/**
+ * Where the resume PDF is served; `None` when there isn't one.
+ */
+resume_url: string | null, };
