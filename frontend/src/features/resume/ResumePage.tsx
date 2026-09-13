@@ -1,6 +1,5 @@
 import { ArrowUpRight } from 'lucide-react'
 import { Fragment } from 'react'
-import { RESUME_PDF_URL } from '@/api/client'
 import { useResume } from '@/api/queries'
 import type { ResumeResponse } from '@/api/types/ResumeResponse'
 import { AdminEdit } from '@/components/AdminEdit'
@@ -18,7 +17,7 @@ export function ResumePage() {
 }
 
 function Resume({ resume }: { resume: ResumeResponse }) {
-  const { profile, experience, education, skill_groups, awards, has_pdf } = resume
+  const { profile, experience, education, skill_groups, awards, pdf_url } = resume
   // In admin mode empty sections still show, so there's an edit button to add the first entry.
   const adminMode = useAdminMode()
   const show = (items: unknown[]) => items.length > 0 || adminMode
@@ -35,11 +34,11 @@ function Resume({ resume }: { resume: ResumeResponse }) {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {has_pdf && (
+          {pdf_url && (
             <>
-              <DownloadButton href={`${RESUME_PDF_URL}?download=1`}>Download PDF</DownloadButton>
+              <DownloadButton href={`${pdf_url}&download=1`}>Download PDF</DownloadButton>
               <Button asChild variant="outline">
-                <a href={RESUME_PDF_URL} target="_blank" rel="noreferrer">
+                <a href={pdf_url} target="_blank" rel="noreferrer">
                   Open in new tab
                   <ArrowUpRight data-icon="inline-end" />
                 </a>

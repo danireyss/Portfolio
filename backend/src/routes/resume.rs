@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::AppState;
-use crate::content::{Award, Education, Experience, Profile, SkillGroup, Social};
+use crate::content::{Award, Content, Education, Experience, Profile, SkillGroup, Social};
 use crate::error::AppError;
 
 #[derive(Serialize, TS)]
@@ -18,8 +18,8 @@ pub struct ResumeResponse<'a> {
     pub education: &'a [Education],
     pub skill_groups: &'a [SkillGroup],
     pub awards: &'a [Award],
-    /// Whether `/api/resume.pdf` is available.
-    pub has_pdf: bool,
+    /// Where the PDF is served, e.g. "/api/resume.pdf?v=…"; `None` when there isn't one.
+    pub pdf_url: Option<String>,
 }
 
 pub(crate) async fn resume(State(state): State<AppState>) -> Response {
@@ -31,9 +31,18 @@ pub(crate) async fn resume(State(state): State<AppState>) -> Response {
         education: content.education(),
         skill_groups: content.skill_groups(),
         awards: content.awards(),
-        has_pdf: content.resume_pdf().is_some(),
+        pdf_url: pdf_url(&state, &content),
     })
     .into_response()
+}
+
+/// `/api/resume.pdf` at the content's version, or `None` without a PDF. A new upload gets a new
+/// URL, so neither browsers nor CloudFront keep showing the old PDF, and an instance that hasn't
+/// loaded it yet checks the store first (see `fresh_content`).
+pub(crate) fn pdf_url(state: &AppState, content: &Content) -> Option<String> {
+    content
+        .resume_pdf()
+        .map(|_| format!("/api/resume.pdf?v={}", state.content.version_tag()))
 }
 
 #[derive(Deserialize)]

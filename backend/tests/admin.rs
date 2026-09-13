@@ -268,7 +268,7 @@ async fn anyone_but_the_owner_gets_the_same_404_as_an_unknown_path() {
     assert_eq!(doc["site"]["profile"]["name"], "Test Person");
     assert_eq!(doc["projects"][0]["slug"], "alpha");
     assert_eq!(doc["projects"][0]["markdown"], "Alpha body.\n");
-    assert_eq!(doc["has_resume"], false);
+    assert!(doc["resume_url"].is_null());
 }
 
 #[tokio::test]
@@ -447,6 +447,25 @@ async fn uploads_go_to_safe_places() {
         let (status, _) = upload(bad.clone()).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{bad}");
     }
+}
+
+#[tokio::test]
+async fn a_new_resume_gets_a_new_url() {
+    let t = TestAdmin::new("resume").await;
+    let reload = async || {
+        let (_, doc) = t.owner("POST", "/api/admin/reload", None, None).await;
+        doc["resume_url"].as_str().unwrap().to_owned()
+    };
+
+    std::fs::write(t.dir.join("resume.pdf"), "first").unwrap();
+    let first = reload().await;
+    std::fs::write(t.dir.join("resume.pdf"), "second, longer").unwrap();
+    let second = reload().await;
+
+    // So neither browsers nor CloudFront answer with the old PDF.
+    assert_ne!(first, second);
+    assert_eq!(t.public("/api/resume").await.1["pdf_url"], second);
+    assert_eq!(t.public(&second).await.1, "second, longer");
 }
 
 #[tokio::test]

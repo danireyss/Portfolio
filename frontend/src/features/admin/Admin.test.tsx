@@ -29,7 +29,7 @@ const content: AdminContent = {
     galleries: [],
   },
   projects: [],
-  has_resume: false,
+  resume_url: null,
 }
 
 const turnOnAdminMode = () => localStorage.setItem('admin-mode', 'on')

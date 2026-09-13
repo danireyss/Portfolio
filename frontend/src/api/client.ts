@@ -6,8 +6,6 @@ import type { ProjectsResponse } from './types/ProjectsResponse'
 import type { ResumeResponse } from './types/ResumeResponse'
 import type { SiteResponse } from './types/SiteResponse'
 
-export const RESUME_PDF_URL = '/api/resume.pdf'
-
 /** A non-2xx API response, carrying the backend's JSON error body when there is one. */
 export class ApiError extends Error {
   readonly status: number

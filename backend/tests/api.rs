@@ -226,10 +226,10 @@ async fn resume_json_and_pdf() {
 
     let (status, json) = app.get_json("/api/resume").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["has_pdf"], true);
+    assert_eq!(json["pdf_url"], "/api/resume.pdf?v=built-in");
     assert_eq!(json["experience"][0]["title"], "Engineer");
 
-    let (status, headers, body) = app.get("/api/resume.pdf").await;
+    let (status, headers, body) = app.get("/api/resume.pdf?v=built-in").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(headers[header::CONTENT_TYPE], "application/pdf");
     assert_eq!(
@@ -238,7 +238,7 @@ async fn resume_json_and_pdf() {
     );
     assert_eq!(body, PDF);
 
-    let (_, headers, _) = app.get("/api/resume.pdf?download=1").await;
+    let (_, headers, _) = app.get("/api/resume.pdf?v=built-in&download=1").await;
     assert!(
         headers[header::CONTENT_DISPOSITION]
             .to_str()
@@ -251,7 +251,7 @@ async fn resume_json_and_pdf() {
 async fn resume_pdf_404s_when_missing() {
     let app = TestApp::new(RecordingMailer::default(), None);
     let (_, json) = app.get_json("/api/resume").await;
-    assert_eq!(json["has_pdf"], false);
+    assert!(json["pdf_url"].is_null());
     let (status, _, _) = app.get("/api/resume.pdf").await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }

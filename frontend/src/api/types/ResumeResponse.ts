@@ -8,6 +8,6 @@ import type { Social } from "./Social";
 
 export type ResumeResponse = { profile: Profile, socials: Array<Social>, experience: Array<Experience>, education: Array<Education>, skill_groups: Array<SkillGroup>, awards: Array<Award>, 
 /**
- * Whether `/api/resume.pdf` is available.
+ * Where the PDF is served, e.g. "/api/resume.pdf?v=…"; `None` when there isn't one.
  */
-has_pdf: boolean, };
+pdf_url: string | null, };

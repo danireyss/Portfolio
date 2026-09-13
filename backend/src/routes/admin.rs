@@ -96,7 +96,8 @@ pub struct AdminContent {
     pub version: String,
     pub site: SiteFile,
     pub projects: Vec<ProjectSource>,
-    pub has_resume: bool,
+    /// Where the resume PDF is served; `None` when there isn't one.
+    pub resume_url: Option<String>,
 }
 
 /// A project as admin saves it.
@@ -140,7 +141,7 @@ fn document(state: &AppState) -> AdminContent {
         version: state.content.version_tag(),
         site: content.site_file().clone(),
         projects: content.project_sources().to_vec(),
-        has_resume: content.resume_pdf().is_some(),
+        resume_url: super::resume::pdf_url(state, &content),
     }
 }
 
