@@ -9,7 +9,7 @@ const THEME_COLORS: Record<Theme, string> = { dark: '#0d0d0d', light: '#f7f4ee' 
 
 const listeners = new Set<() => void>()
 
-/** The theme is the `dark` class on <html>; index.html starts with it, so dark is the default. */
+/** The theme is the `dark` class on <html>; index.html starts without it, so light is default. */
 function getTheme(): Theme {
   return document.documentElement.classList.contains('dark') ? 'dark' : 'light'
 }

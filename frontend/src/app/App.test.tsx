@@ -141,23 +141,22 @@ describe('theme toggle', () => {
     localStorage.clear()
   })
 
-  it('switches between dark and light and remembers the choice', async () => {
-    // index.html starts in dark mode.
-    root.classList.add('dark')
+  it('switches between light and dark and remembers the choice', async () => {
+    // index.html starts in light mode.
     mockApi({ '/api/site': site, '/api/projects': projects })
     renderApp('/')
     const user = userEvent.setup()
     const toggle = screen.getByRole('switch', { name: 'Dark theme' })
-    expect(toggle).toBeChecked()
-
-    await user.click(toggle)
     expect(toggle).not.toBeChecked()
-    expect(root).not.toHaveClass('dark')
-    expect(localStorage.getItem('theme')).toBe('light')
 
     await user.click(toggle)
     expect(toggle).toBeChecked()
     expect(root).toHaveClass('dark')
     expect(localStorage.getItem('theme')).toBe('dark')
+
+    await user.click(toggle)
+    expect(toggle).not.toBeChecked()
+    expect(root).not.toHaveClass('dark')
+    expect(localStorage.getItem('theme')).toBe('light')
   })
 })
