@@ -469,6 +469,41 @@ async fn a_new_resume_gets_a_new_url() {
 }
 
 #[tokio::test]
+async fn the_resume_page_is_read_from_the_pdf() {
+    let t = TestAdmin::new("resume-import").await;
+    let import = || t.owner("POST", "/api/admin/resume/import", None, None);
+
+    let (status, body) = import().await;
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "no PDF yet: {body}"
+    );
+
+    let pdf = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/resume.pdf");
+    std::fs::copy(pdf, t.dir.join("resume.pdf")).unwrap();
+    let (status, doc) = import().await;
+    assert_eq!(status, StatusCode::OK, "{doc}");
+    assert_eq!(
+        doc["site"]["experience"][0]["company"],
+        "Stealth Start-Up (AI Company)"
+    );
+    assert_eq!(
+        t.public("/api/resume").await.1["awards"][0]["title"],
+        "Summit Impact Award"
+    );
+    assert!(t.file("site.toml").contains("Summit Impact Award"), "saved");
+
+    std::fs::write(t.dir.join("resume.pdf"), "not a pdf").unwrap();
+    let (status, body) = import().await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+    assert!(
+        t.file("site.toml").contains("Summit Impact Award"),
+        "left as it was"
+    );
+}
+
+#[tokio::test]
 async fn photos_can_be_deleted() {
     let t = TestAdmin::new("photos").await;
     let (status, _) = t

@@ -17,7 +17,7 @@ use crate::AppState;
 use crate::admin::{Admin, MediaError, SessionUser, UploadKind, UploadTicket};
 use crate::content::{
     Content, ContentSources, ContentStore, FrontMatter, ProjectSource, SiteFile, is_slug,
-    project_file, site_toml,
+    project_file, read_resume, site_toml,
 };
 use crate::error::AppError;
 
@@ -37,6 +37,7 @@ pub(crate) fn router() -> Router<AppState> {
         )
         .route("/photos/{folder}/{file}", delete(delete_photo))
         .route("/reload", post(reload))
+        .route("/resume/import", post(import_resume))
 }
 
 /// The request comes from the site's owner: a Better Auth session for `ADMIN_EMAIL` with a
@@ -433,6 +434,34 @@ async fn reload(_: Owner, State(state): State<AppState>) -> Result<Json<AdminCon
     let _one_at_a_time = admin.writes.lock().await;
     publish(&state, admin, store.as_ref()).await?;
     Ok(Json(document(&state)))
+}
+
+/// Has the resume page's experience, education, skills, and awards match the resume PDF. Admin
+/// calls it after uploading a new PDF (and `POST /api/admin/reload`, which publishes it).
+async fn import_resume(
+    _: Owner,
+    State(state): State<AppState>,
+) -> Result<Json<AdminContent>, AppError> {
+    // Read the latest PDF, not one this instance hasn't noticed is replaced.
+    state.content.refresh().await;
+    let pdf = state
+        .content
+        .get()
+        .resume_pdf()
+        .cloned()
+        .ok_or_else(|| invalid("There's no resume PDF yet. Upload one first."))?;
+    // Parsing is CPU work, so it stays off the async threads.
+    let sections = tokio::task::spawn_blocking(move || read_resume(&pdf))
+        .await
+        .map_err(storage)?
+        .map_err(invalid)?;
+    save(&state, &HeaderMap::new(), |content| {
+        let mut site = content.site_file().clone();
+        sections.apply_to(&mut site);
+        let text = site_toml(&site).map_err(invalid)?;
+        Ok(vec![Change::Put("site.toml".into(), text)])
+    })
+    .await
 }
 
 #[cfg(test)]
