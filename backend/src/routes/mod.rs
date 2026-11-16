@@ -13,9 +13,11 @@ use axum::routing::{get, post};
 use crate::AppState;
 use crate::error::AppError;
 
-/// A read asking for `?v=<version tag>` (admin sends it right after a save) gets at least that
-/// version: an instance that hasn't noticed it yet checks the store before answering. The new
-/// query string also keeps CloudFront from answering with a cached copy.
+/// Every request first checks the store for new content when a check is due (see
+/// `ContentHandle::refresh_if_due`). A read asking for `?v=<version tag>` (admin sends it right
+/// after a save) gets at least that version: an instance that hasn't noticed it yet checks the
+/// store before answering. The new query string also keeps CloudFront from answering with a
+/// cached copy.
 pub(crate) async fn fresh_content(
     State(state): State<AppState>,
     request: Request,
@@ -28,6 +30,8 @@ pub(crate) async fn fresh_content(
         .is_some_and(|wanted| wanted != state.content.version_tag());
     if behind {
         state.content.refresh().await;
+    } else {
+        state.content.refresh_if_due().await;
     }
     next.run(request).await
 }

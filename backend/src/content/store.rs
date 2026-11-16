@@ -81,14 +81,23 @@ pub trait ContentStore: Send + Sync {
 /// The content being served. Built from a store, it checks at most every `check_every` whether
 /// the store has changed and swaps in the new content, so saves made by any instance reach them
 /// all. New content that fails to load is logged and the current content stays.
+///
+/// Checks run inside a request ([`ContentHandle::refresh_if_due`]), never in a background task:
+/// Lambda freezes an instance as soon as it has answered, so a background check could stall
+/// mid-request and leave that instance on old content until it's retired.
 pub struct ContentHandle {
     current: RwLock<Arc<Content>>,
     source: Option<Source>,
 }
 
+/// How long a request waits on a due check before going ahead with the current content. The
+/// check normally takes one small S3 request, or a few when there's new content.
+const CHECK_TIMEOUT: Duration = Duration::from_secs(3);
+
 struct Source {
     store: Arc<dyn ContentStore>,
     check_every: Duration,
+    check_timeout: Duration,
     state: Mutex<SourceState>,
 }
 
@@ -102,6 +111,18 @@ struct SourceState {
 impl Source {
     fn state(&self) -> MutexGuard<'_, SourceState> {
         self.state.lock_ignoring_poison()
+    }
+}
+
+/// Ends a due check however it ends (finished, timed out, or the request was dropped), so the
+/// next one can start.
+struct CheckDone<'a>(&'a Source);
+
+impl Drop for CheckDone<'_> {
+    fn drop(&mut self) {
+        let mut state = self.0.state();
+        state.checking = false;
+        state.checked = Instant::now();
     }
 }
 
@@ -127,6 +148,7 @@ impl ContentHandle {
             source: Some(Source {
                 store,
                 check_every,
+                check_timeout: CHECK_TIMEOUT,
                 state: Mutex::new(SourceState {
                     version,
                     checked: Instant::now(),
@@ -134,6 +156,14 @@ impl ContentHandle {
                 }),
             }),
         })
+    }
+
+    #[cfg(test)]
+    fn with_check_timeout(mut self, timeout: Duration) -> Self {
+        if let Some(source) = &mut self.source {
+            source.check_timeout = timeout;
+        }
+        self
     }
 
     /// Where the content comes from; `None` for fixed content.
@@ -170,16 +200,31 @@ impl ContentHandle {
         Ok(())
     }
 
-    /// The current content. When a check is due it also starts one in the background, whose
-    /// result later requests see; this one never waits on the store.
-    pub fn get(self: &Arc<Self>) -> Arc<Content> {
-        if self.check_due() {
-            let this = Arc::clone(self);
-            tokio::spawn(async move {
-                this.refresh().await;
-            });
-        }
+    /// The current content. Requests see newer content once [`ContentHandle::refresh_if_due`]
+    /// (run on every API request) or [`ContentHandle::refresh`] has loaded it.
+    pub fn get(&self) -> Arc<Content> {
         Arc::clone(&self.current.read_ignoring_poison())
+    }
+
+    /// Checks the store for a new version if a check is due, waiting at most `check_timeout` for
+    /// it. Only one request checks at a time; the others go ahead with the current content.
+    pub async fn refresh_if_due(&self) {
+        let Some(source) = &self.source else {
+            return;
+        };
+        if !self.check_due() {
+            return;
+        }
+        let _done = CheckDone(source);
+        if tokio::time::timeout(source.check_timeout, self.refresh())
+            .await
+            .is_err()
+        {
+            tracing::warn!(
+                timeout = ?source.check_timeout,
+                "checking for new content took too long; trying again on a later request"
+            );
+        }
     }
 
     /// Reloads if the store's version has changed; returns whether it did.
@@ -686,7 +731,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn get_checks_in_the_background_without_waiting() {
+    async fn refresh_if_due_loads_new_content_only_once_a_check_is_due() {
         let store = MemoryStore::with_site(site("First"));
         let handle = Arc::new(
             ContentHandle::from_store(store.clone(), Duration::ZERO)
@@ -694,9 +739,79 @@ mod tests {
                 .unwrap(),
         );
         store.set(site("Second"));
-        assert_eq!(tagline(&handle), "First", "this request doesn't wait");
-        tokio::time::sleep(Duration::from_millis(20)).await;
+        assert_eq!(tagline(&handle), "First", "get alone never checks");
+        handle.refresh_if_due().await;
         assert_eq!(tagline(&handle), "Second");
+
+        let not_due = Arc::new(
+            ContentHandle::from_store(store.clone(), Duration::MAX)
+                .await
+                .unwrap(),
+        );
+        store.set(site("Third"));
+        not_due.refresh_if_due().await;
+        assert_eq!(tagline(&not_due), "Second", "no check before check_every");
+    }
+
+    /// A store whose `version` never answers while `hang` is set, like an S3 request on a
+    /// connection that went stale while Lambda had the instance frozen.
+    struct HangingStore {
+        inner: Arc<MemoryStore>,
+        hang: std::sync::atomic::AtomicBool,
+    }
+
+    #[async_trait]
+    impl ContentStore for HangingStore {
+        async fn version(&self) -> Result<Option<String>, ContentStoreError> {
+            if self.hang.load(std::sync::atomic::Ordering::SeqCst) {
+                std::future::pending::<()>().await;
+            }
+            self.inner.version().await
+        }
+        async fn load(&self) -> Result<Option<ContentSources>, ContentStoreError> {
+            self.inner.load().await
+        }
+        async fn put(&self, path: &str, bytes: Bytes) -> Result<(), ContentStoreError> {
+            self.inner.put(path, bytes).await
+        }
+        async fn delete(&self, path: &str) -> Result<(), ContentStoreError> {
+            self.inner.delete(path).await
+        }
+        async fn touch_version(&self) -> Result<(), ContentStoreError> {
+            self.inner.touch_version().await
+        }
+    }
+
+    #[tokio::test]
+    async fn a_check_that_hangs_gives_up_and_later_checks_still_run() {
+        let inner = MemoryStore::with_site(site("First"));
+        let store = Arc::new(HangingStore {
+            inner: inner.clone(),
+            hang: false.into(),
+        });
+        let handle = Arc::new(
+            ContentHandle::from_store(store.clone(), Duration::ZERO)
+                .await
+                .unwrap()
+                .with_check_timeout(Duration::from_millis(50)),
+        );
+
+        inner.set(site("Second"));
+        store.hang.store(true, std::sync::atomic::Ordering::SeqCst);
+        let check = tokio::time::timeout(Duration::from_secs(5), handle.refresh_if_due()).await;
+        assert!(
+            check.is_ok(),
+            "the request goes ahead instead of waiting on the store"
+        );
+        assert_eq!(tagline(&handle), "First");
+
+        store.hang.store(false, std::sync::atomic::Ordering::SeqCst);
+        handle.refresh_if_due().await;
+        assert_eq!(
+            tagline(&handle),
+            "Second",
+            "the stalled check didn't block the next"
+        );
     }
 
     #[test]
