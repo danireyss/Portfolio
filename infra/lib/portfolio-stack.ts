@@ -3,6 +3,7 @@ import type { Construct } from 'constructs'
 import { Api } from './constructs/api'
 import { Auth } from './constructs/auth'
 import { MediaBucket } from './constructs/media-bucket'
+import { PageRenderer } from './constructs/page-renderer'
 import { SiteDomain, type SiteDomainProps } from './constructs/site-domain'
 import { Website } from './constructs/website'
 
@@ -24,13 +25,15 @@ export interface PortfolioStackProps extends StackProps {
   readonly lambdaCodePath: string
   /** The frontend's browser build, `dist/client/` (npm run build). */
   readonly siteAssetPath: string
+  /** The frontend's server build, `dist/server/` (npm run build). */
+  readonly siteServerPath: string
   /** Signing in to edit the site's content (/admin). */
   readonly admin: AdminProps
 }
 
 /**
- * The whole site: CloudFront in front of the React app, the Rust API, the Better Auth service,
- * and the media bucket (content, photos, and uploads).
+ * The whole site: CloudFront in front of the React app and its server renderer, the Rust API, the
+ * Better Auth service, and the media bucket (content, photos, and uploads).
  */
 export class PortfolioStack extends Stack {
   constructor(scope: Construct, id: string, props: PortfolioStackProps) {
@@ -52,8 +55,15 @@ export class PortfolioStack extends Stack {
     // The API lists gallery folders; CloudFront serves the photos themselves.
     media.grantList(api.handler, 'photos/')
 
+    // Pages get their data from the API directly; CloudFront caches the pages themselves.
+    const renderer = new PageRenderer(this, 'Renderer', {
+      codePath: props.siteServerPath,
+      apiUrl: api.httpApi.apiEndpoint,
+    })
+
     const website = new Website(this, 'Website', {
       assetPath: props.siteAssetPath,
+      renderer,
       apiOriginDomain: api.originDomain,
       mediaBucket: media.bucket,
       domain,

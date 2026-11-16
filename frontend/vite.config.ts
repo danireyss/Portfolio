@@ -37,7 +37,7 @@ type PageResponse = { status: number; headers: Record<string, string>; body: str
 /**
  * Renders pages on the server in `vite` (dev) and `vite preview`, as src/lambda.ts does in
  * production. A request Vite has no file for is a page when the last segment of its path has no
- * file extension, the same rule CloudFront follows (infra/lib/viewer-request.ts).
+ * file extension, close to the rule CloudFront follows (infra/lib/constructs/website.ts).
  */
 function serverRender(): Plugin {
   // Where the renderer fetches page data; the browser goes through `server.proxy` instead.

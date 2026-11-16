@@ -14,15 +14,18 @@ export const testStack = () => new Stack(testApp(), 'Test', { env })
 /** The real auth service: NodejsFunction checks that its entry file and lock file exist. */
 export const authProjectRoot = join(__dirname, '..', '..', 'auth')
 
-/** Stand-ins for the Lambda binary and the frontend build, so tests don't need real builds. */
+/** Stand-ins for the Lambda binary and the frontend builds, so tests don't need real builds. */
 export function fakeBuilds() {
   const root = mkdtempSync(join(tmpdir(), 'portfolio-infra-'))
   const lambdaCodePath = join(root, 'lambda')
-  const siteAssetPath = join(root, 'dist')
+  const siteAssetPath = join(root, 'dist', 'client')
+  const siteServerPath = join(root, 'dist', 'server')
   mkdirSync(lambdaCodePath)
   mkdirSync(join(siteAssetPath, 'assets'), { recursive: true })
+  mkdirSync(siteServerPath)
   writeFileSync(join(lambdaCodePath, 'bootstrap'), '')
   writeFileSync(join(siteAssetPath, 'index.html'), '')
   writeFileSync(join(siteAssetPath, 'assets', 'index-abc.js'), '')
-  return { lambdaCodePath, siteAssetPath }
+  writeFileSync(join(siteServerPath, 'lambda.mjs'), '')
+  return { lambdaCodePath, siteAssetPath, siteServerPath }
 }
