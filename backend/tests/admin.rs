@@ -311,7 +311,7 @@ async fn saving_the_site_publishes_it_and_refuses_stale_versions() {
     assert_eq!(public["about"]["background"], json!(["Edited from admin."]));
     assert_eq!(public["about"]["focus_areas"][0]["title"], "Backend");
     assert!(t.file("site.toml").contains("Edited from admin."));
-    assert_eq!(*t.cdn.invalidated.lock().unwrap(), ["/api/*"]);
+    assert_eq!(*t.cdn.invalidated.lock().unwrap(), ["/*"]);
 
     let (status, body) = t
         .owner("PUT", "/api/admin/site", Some(&version), Some(site))
@@ -511,7 +511,7 @@ async fn photos_can_be_deleted() {
         .await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     assert_eq!(*t.media.deleted.lock().unwrap(), ["photos/trip/01.jpg"]);
-    assert_eq!(*t.cdn.invalidated.lock().unwrap(), ["/api/*"]);
+    assert_eq!(*t.cdn.invalidated.lock().unwrap(), ["/*"]);
 
     let (status, _) = t
         .owner(

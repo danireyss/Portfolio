@@ -71,6 +71,17 @@ test('gives the API what admin needs', () => {
   }
 })
 
+test('renders pages with data from the API itself, not through CloudFront', () => {
+  template.hasResourceProperties('AWS::Lambda::Function', {
+    Handler: 'lambda.handler',
+    Environment: {
+      Variables: {
+        API_URL: { 'Fn::GetAtt': [Match.stringLikeRegexp('^ApiHttpApi'), 'ApiEndpoint'] },
+      },
+    },
+  })
+})
+
 test('lets the site upload straight to the media bucket', () => {
   template.hasResourceProperties('AWS::S3::Bucket', {
     CorsConfiguration: {

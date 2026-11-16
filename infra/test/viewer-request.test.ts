@@ -11,15 +11,10 @@ const handler = new Function(`${VIEWER_REQUEST_CODE}; return handler;`)() as (ev
 const run = (uri: string, host = 'danireyss.dev') =>
   handler({ request: { uri, headers: { host: { value: host } } } })
 
-test('serves the app shell for extension-less routes', () => {
-  expect((run('/projects/this-website') as Request).uri).toBe('/index.html')
-  expect((run('/photos') as Request).uri).toBe('/index.html')
-  expect((run('/') as Request).uri).toBe('/index.html')
-})
-
-test('passes files through untouched', () => {
-  expect((run('/assets/index-abc123.js') as Request).uri).toBe('/assets/index-abc123.js')
-  expect((run('/headshot.jpg') as Request).uri).toBe('/headshot.jpg')
+test('passes pages and files through untouched, for the server renderer and the bucket', () => {
+  for (const uri of ['/', '/projects/this-website', '/photos', '/assets/index-abc123.js', '/headshot.jpg']) {
+    expect((run(uri) as Request).uri).toBe(uri)
+  }
 })
 
 test('redirects www to the apex domain, keeping the path', () => {

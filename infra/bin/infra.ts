@@ -11,10 +11,12 @@ const repoRoot = join(__dirname, '..', '..')
 // and npm ci in auth/ (esbuild bundles the auth service from its node_modules).
 const lambdaCodePath = join(repoRoot, 'backend/target/lambda/portfolio-api')
 const siteAssetPath = join(repoRoot, 'frontend/dist/client')
+const siteServerPath = join(repoRoot, 'frontend/dist/server')
 const authProjectRoot = join(repoRoot, 'auth')
 for (const [path, hint] of [
   [join(lambdaCodePath, 'bootstrap'), 'make build-backend'],
   [join(siteAssetPath, 'index.html'), 'make build-frontend'],
+  [join(siteServerPath, 'lambda.mjs'), 'make build-frontend'],
   [join(authProjectRoot, 'node_modules'), 'make build-auth'],
 ]) {
   if (!existsSync(path)) {
@@ -28,11 +30,12 @@ const env = { account: process.env.CDK_DEFAULT_ACCOUNT, region: config.region }
 new PortfolioStack(app, 'PortfolioStack', {
   env,
   description:
-    'Portfolio: React on S3 + CloudFront, Rust Axum API and Better Auth on Lambda, media bucket, SES',
+    'Portfolio: React on S3 + CloudFront with server rendering, Rust Axum API and Better Auth on Lambda, media bucket, SES',
   domain: config.domain,
   contactEmail: config.contactEmail,
   lambdaCodePath,
   siteAssetPath,
+  siteServerPath,
   admin: {
     email: config.admin.email,
     secretsPrefix: config.admin.secretsPrefix,

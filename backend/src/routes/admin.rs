@@ -276,11 +276,12 @@ async fn publish(
     Ok(())
 }
 
-/// Forgets this instance's photo listings and CloudFront's cached API responses.
+/// Forgets this instance's photo listings, and everything CloudFront keeps: the API's responses and
+/// the pages rendered from them alike.
 async fn clear_caches(state: &AppState, admin: &Admin) {
     state.photos.invalidate();
-    if let Err(error) = admin.cdn.invalidate(&["/api/*"]).await {
-        tracing::warn!(%error, "couldn't clear CloudFront's cached API responses; they expire within 5 minutes");
+    if let Err(error) = admin.cdn.invalidate(&["/*"]).await {
+        tracing::warn!(%error, "couldn't clear CloudFront's cache; API responses and pages expire within 5 minutes");
     }
 }
 

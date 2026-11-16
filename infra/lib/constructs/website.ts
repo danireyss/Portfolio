@@ -2,15 +2,19 @@ import { join } from 'node:path'
 import { Duration, RemovalPolicy } from 'aws-cdk-lib'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins'
+import * as iam from 'aws-cdk-lib/aws-iam'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment'
 import { Construct } from 'constructs'
 import { VIEWER_REQUEST_CODE } from '../viewer-request'
+import type { PageRenderer } from './page-renderer'
 import type { SiteDomain } from './site-domain'
 
 export interface WebsiteProps {
   /** The frontend's browser build, `dist/client/` (npm run build). */
   readonly assetPath: string
+  /** Renders the site's pages; CloudFront sends it every request that isn't for a file. */
+  readonly renderer: PageRenderer
   /** Hostname that serves /api/* (the HTTP API). */
   readonly apiOriginDomain: string
   /** Bucket that serves /photos/* and /uploads/*. */
@@ -20,12 +24,16 @@ export interface WebsiteProps {
 }
 
 /**
- * The built React app in a private bucket behind CloudFront, which also fronts the API and the
- * media bucket:
+ * CloudFront in front of the server renderer, the built React app (in a private bucket), the API,
+ * and the media bucket:
  * - `/api/auth/*`, `/api/admin/*` -> the API origin, never cached (sign-in and admin)
  * - `/api/*`                      -> the API origin, cached for a few minutes
  * - `/photos/*`, `/uploads/*`     -> the media bucket
- * - everything else               -> the site bucket
+ * - `/assets/*`, `/*.*` (files)   -> the site bucket
+ * - everything else (pages)       -> the server renderer, cached as long as it says
+ *
+ * Pages are told apart from files the way the dev server does it (frontend/vite.config.ts): a
+ * file's path has a dot in it. So a page's address mustn't (project slugs can't).
  */
 export class Website extends Construct {
   readonly distribution: cloudfront.Distribution
@@ -45,7 +53,7 @@ export class Website extends Construct {
     })
 
     const viewerRequest = new cloudfront.Function(this, 'ViewerRequest', {
-      comment: 'Redirect www to the apex; serve index.html for app routes',
+      comment: 'Redirect www to the apex',
       runtime: cloudfront.FunctionRuntime.JS_2_0,
       code: cloudfront.FunctionCode.fromInline(VIEWER_REQUEST_CODE),
     })
@@ -62,7 +70,23 @@ export class Website extends Construct {
       enableAcceptEncodingBrotli: true,
     })
 
+    // The renderer says how long to keep each page (Cache-Control: s-maxage), and that errors
+    // aren't to be kept at all, which a minimum TTL above zero would override. Query strings are
+    // part of the key for /projects?tag=...
+    const pageCachePolicy = new cloudfront.CachePolicy(this, 'PageCachePolicy', {
+      comment: 'Server-rendered pages',
+      defaultTtl: Duration.seconds(0),
+      minTtl: Duration.seconds(0),
+      maxTtl: Duration.days(1),
+      queryStringBehavior: cloudfront.CacheQueryStringBehavior.all(),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
+    })
+
     const securityHeaders = cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS
+    const wwwRedirect = [
+      { function: viewerRequest, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
+    ]
     const api = new origins.HttpOrigin(props.apiOriginDomain)
     const media = origins.S3BucketOrigin.withOriginAccessControl(props.mediaBucket)
     // Every /api/* behavior differs only in how long responses are cached. API Gateway routes on
@@ -83,24 +107,31 @@ export class Website extends Construct {
       cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
       responseHeadersPolicy: securityHeaders,
     }
+    const siteFiles: cloudfront.BehaviorOptions = {
+      origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
+      viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+      cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+      responseHeadersPolicy: securityHeaders,
+      functionAssociations: wwwRedirect,
+    }
     this.distribution = new cloudfront.Distribution(this, 'Distribution', {
       comment: 'Portfolio site',
       domainNames: props.domain?.names,
       certificate: props.domain?.certificate,
-      defaultRootObject: 'index.html',
       httpVersion: cloudfront.HttpVersion.HTTP2_AND_3,
       minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
+      // Pages. Only the query string is forwarded (it's in the cache key); the renderer reads nothing
+      // else, and its function URL must see its own Host.
       defaultBehavior: {
-        origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
+        origin: origins.FunctionUrlOrigin.withOriginAccessControl(props.renderer.url),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        cachePolicy: pageCachePolicy,
         responseHeadersPolicy: securityHeaders,
-        functionAssociations: [
-          { function: viewerRequest, eventType: cloudfront.FunctionEventType.VIEWER_REQUEST },
-        ],
+        functionAssociations: wwwRedirect,
       },
-      // CloudFront uses the first pattern that matches, so the uncached /api paths come first.
+      // CloudFront uses the first pattern that matches: the uncached /api paths come before /api/*,
+      // and everything with its own behavior before the catch-all for files, /*.*.
       additionalBehaviors: {
         '/api/auth/*': uncachedApi,
         '/api/admin/*': uncachedApi,
@@ -108,7 +139,18 @@ export class Website extends Construct {
         '/photos/*': mediaFiles,
         // Headshots uploaded through admin.
         '/uploads/*': mediaFiles,
+        // Vite's hashed bundles, and the other files in the build (favicon, headshot, robots.txt).
+        '/assets/*': siteFiles,
+        '/*.*': siteFiles,
       },
+    })
+    // Origin access control grants lambda:InvokeFunctionUrl; function URLs created since October
+    // 2025 also need lambda:InvokeFunction, allowed only by way of the URL.
+    props.renderer.handler.addPermission('CloudFrontInvoke', {
+      principal: new iam.ServicePrincipal('cloudfront.amazonaws.com'),
+      action: 'lambda:InvokeFunction',
+      sourceArn: this.distribution.distributionArn,
+      invokedViaFunctionUrl: true,
     })
     this.url = `https://${props.domain?.names[0] ?? this.distribution.distributionDomainName}`
 
@@ -118,9 +160,9 @@ export class Website extends Construct {
   /**
    * Uploads the build in two parts. Vite's hashed bundles (`assets/`) never change, so browsers
    * may cache them for a year; they go up first and are never pruned, so a page loaded before a
-   * deploy can still fetch its bundles. Everything else (index.html, favicon, headshot) is
+   * deploy can still fetch its bundles. Everything else (favicon, headshot) is
    * revalidated by browsers on every visit, but CloudFront keeps it (`s-maxage`) until the next
-   * deploy invalidates `/*`, so those revalidations are answered at the edge instead of going
+   * deploy invalidates `/*` (rendered pages included), so those revalidations are answered at the edge instead of going
    * back to S3. Local gallery photos are skipped: they belong in the media bucket.
    */
   private upload(bucket: s3.IBucket, assetPath: string) {
