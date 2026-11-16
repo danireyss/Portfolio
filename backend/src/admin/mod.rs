@@ -25,7 +25,7 @@ pub struct Admin {
     pub origins: Vec<String>,
     /// Uploads (headshot, resume, photos) and photo deletions.
     pub media: Arc<dyn MediaStore>,
-    /// Clears CloudFront's cached API responses after a change.
+    /// Clears CloudFront's cached API responses and pages after a change.
     pub cdn: Arc<dyn CacheInvalidator>,
     /// Saves on this instance happen one at a time.
     pub(crate) writes: tokio::sync::Mutex<()>,

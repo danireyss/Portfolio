@@ -1,5 +1,5 @@
-//! Clearing CloudFront's cached API responses after admin changes content, so visitors see it
-//! right away instead of within the cache's 5 minutes.
+//! Clearing CloudFront's cached API responses and rendered pages after admin changes content, so
+//! visitors see it right away instead of within the cache's 5 minutes.
 
 use async_trait::async_trait;
 use aws_sdk_cloudfront::error::DisplayErrorContext;
@@ -14,7 +14,7 @@ pub struct CdnError(pub String);
 
 #[async_trait]
 pub trait CacheInvalidator: Send + Sync {
-    /// Paths like "/api/*".
+    /// Paths like "/*".
     async fn invalidate(&self, paths: &[&str]) -> Result<(), CdnError>;
 }
 
