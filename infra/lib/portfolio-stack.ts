@@ -22,7 +22,7 @@ export interface PortfolioStackProps extends StackProps {
   readonly contactEmail: string
   /** Directory containing the Lambda `bootstrap` binary (cargo lambda build --release --arm64). */
   readonly lambdaCodePath: string
-  /** The frontend's `dist/` directory (npm run build). */
+  /** The frontend's browser build, `dist/client/` (npm run build). */
   readonly siteAssetPath: string
   /** Signing in to edit the site's content (/admin). */
   readonly admin: AdminProps
