@@ -18,21 +18,24 @@ class NoopObserver {
   }
 }
 
-Object.assign(globalThis, {
-  IntersectionObserver: NoopObserver,
-  ResizeObserver: NoopObserver,
-})
+// Server-rendering tests run in plain Node, with no window at all.
+if (typeof window !== 'undefined') {
+  Object.assign(globalThis, {
+    IntersectionObserver: NoopObserver,
+    ResizeObserver: NoopObserver,
+  })
 
-window.matchMedia ??= (query: string) =>
-  ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => {},
-    removeListener: () => {},
-    addEventListener: () => {},
-    removeEventListener: () => {},
-    dispatchEvent: () => false,
-  }) as MediaQueryList
+  window.matchMedia ??= (query: string) =>
+    ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as MediaQueryList
 
-window.scrollTo = () => {}
+  window.scrollTo = () => {}
+}

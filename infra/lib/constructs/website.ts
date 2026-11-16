@@ -9,7 +9,7 @@ import { VIEWER_REQUEST_CODE } from '../viewer-request'
 import type { SiteDomain } from './site-domain'
 
 export interface WebsiteProps {
-  /** The frontend's `dist/` directory (npm run build). */
+  /** The frontend's browser build, `dist/client/` (npm run build). */
   readonly assetPath: string
   /** Hostname that serves /api/* (the HTTP API). */
   readonly apiOriginDomain: string

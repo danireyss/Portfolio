@@ -33,7 +33,10 @@ function subscribe(listener: () => void) {
   }
 }
 
-/** The current theme, re-rendering whenever it changes. */
+/**
+ * The current theme, re-rendering whenever it changes. The server renders light, and hydration
+ * starts from light too before switching to a saved dark theme, so the two always match.
+ */
 export function useTheme(): Theme {
-  return useSyncExternalStore(subscribe, getTheme)
+  return useSyncExternalStore(subscribe, getTheme, () => 'light')
 }

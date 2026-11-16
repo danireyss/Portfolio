@@ -18,41 +18,16 @@
         }
       } catch {}
     </script>
-    <script>
-      // Every page needs /api/site and /api/photos (the nav shows Photos only when there are
-      // photos), and /api/site names the home page's largest image, the headshot: request them
-      // now instead of after the app's JavaScript has loaded, so the first render already has
-      // them. The app takes the responses over in src/api/queries.ts (adoptEarlyData).
-      {
-        const get = (path) => {
-          const data = fetch(path, { headers: { Accept: 'application/json' } }).then((response) => {
-            if (!response.ok) throw new Error(`GET ${path}: ${response.status}`)
-            return response.json()
-          })
-          // The app handles a failure (it fetches again); this only keeps it out of the console.
-          data.catch(() => {})
-          return data
-        }
-        window.__early = { site: get('/api/site'), photos: get('/api/photos') }
-      }
-      if (location.pathname === '/') {
-        window.__early.site.then((site) => {
-          const headshot = site.profile && site.profile.headshot
-          if (!headshot) return
-          const link = document.createElement('link')
-          link.rel = 'preload'
-          link.as = 'image'
-          link.href = headshot
-          link.fetchPriority = 'high'
-          document.head.append(link)
-        }, () => {})
-      }
-    </script>
+    <!-- The server renderer (src/entry-server.tsx) swaps in the page's own title and meta tags
+         between these markers, the page into #root, and the data it rendered from after it. -->
+    <!--app-head-->
     <meta name="description" content="Daniel Reyes, software engineer: projects, resume, and contact." />
     <title>Daniel Reyes</title>
+    <!--/app-head-->
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!--app-html--></div>
+    <!--app-state-->
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

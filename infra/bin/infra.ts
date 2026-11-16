@@ -10,7 +10,7 @@ const repoRoot = join(__dirname, '..', '..')
 // All built before synth by `make build`: cargo lambda build --release --arm64, npm run build,
 // and npm ci in auth/ (esbuild bundles the auth service from its node_modules).
 const lambdaCodePath = join(repoRoot, 'backend/target/lambda/portfolio-api')
-const siteAssetPath = join(repoRoot, 'frontend/dist')
+const siteAssetPath = join(repoRoot, 'frontend/dist/client')
 const authProjectRoot = join(repoRoot, 'auth')
 for (const [path, hint] of [
   [join(lambdaCodePath, 'bootstrap'), 'make build-backend'],

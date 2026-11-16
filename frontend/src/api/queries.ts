@@ -8,8 +8,6 @@ import {
 import { useCallback } from 'react'
 import { preloadStackPhotos } from '@/lib/photos'
 import { api, isNotFound } from './client'
-import type { PhotosResponse } from './types/PhotosResponse'
-import type { SiteResponse } from './types/SiteResponse'
 
 export function createQueryClient() {
   return new QueryClient({
@@ -33,25 +31,6 @@ export const queries = {
   photos: () => queryOptions({ queryKey: ['photos'], queryFn: api.photos }),
 }
 
-declare global {
-  interface Window {
-    /** Requested by index.html before the app's code loaded; see adoptEarlyData. */
-    __early?: { site: Promise<SiteResponse>; photos: Promise<PhotosResponse> }
-  }
-}
-
-/**
- * Hands index.html's early requests to their queries, so the app doesn't fetch them again and
- * usually has the data by its first render. A request that failed is fetched again normally.
- */
-export function adoptEarlyData(queryClient: QueryClient) {
-  const early = window.__early
-  if (!early) return
-  window.__early = undefined
-  void queryClient.prefetchQuery({ ...queries.site(), queryFn: () => early.site.catch(() => api.site()) })
-  void queryClient.prefetchQuery({ ...queries.photos(), queryFn: () => early.photos.catch(() => api.photos()) })
-}
-
 export const useSite = () => useQuery(queries.site())
 
 export const useProjects = () => useQuery(queries.projects())
@@ -64,22 +43,40 @@ export const usePhotos = () => useQuery(queries.photos())
 
 export const useSendContact = () => useMutation({ mutationFn: api.contact })
 
+/**
+ * Starts fetching what the page at `path` shows, besides the site and photos the layout needs on
+ * every page; each promise settles when its request has.
+ */
+function prefetchPageQueries(queryClient: QueryClient, path: string): Promise<void>[] {
+  if (path === '/' || path === '/projects') return [queryClient.prefetchQuery(queries.projects())]
+  if (path.startsWith('/projects/')) {
+    const slug = decodeURIComponent(path.slice('/projects/'.length))
+    return [queryClient.prefetchQuery(queries.project(slug))]
+  }
+  if (path === '/resume') return [queryClient.prefetchQuery(queries.resume())]
+  return []
+}
+
 /** Starts fetching what the page at `path` shows. Data that's already cached isn't refetched. */
 export function prefetchPageData(queryClient: QueryClient, path: string) {
-  if (path === '/') {
-    void queryClient.prefetchQuery(queries.site())
-    void queryClient.prefetchQuery(queries.projects())
-  } else if (path === '/projects') {
-    void queryClient.prefetchQuery(queries.projects())
-  } else if (path.startsWith('/projects/')) {
-    const slug = decodeURIComponent(path.slice('/projects/'.length))
-    void queryClient.prefetchQuery(queries.project(slug))
-  } else if (path === '/photos') {
+  if (path === '/photos') {
     // Its data is usually cached already; the photos themselves are what the page waits on.
     void queryClient.fetchQuery(queries.photos()).then(preloadStackPhotos, () => {})
-  } else if (path === '/resume') {
-    void queryClient.prefetchQuery(queries.resume())
+    return
   }
+  prefetchPageQueries(queryClient, path)
+}
+
+/**
+ * For the server renderer: fetches everything the page at `path` renders, the layout's site and
+ * photos included. Resolves once every request has settled; failures stay in the cache as errors.
+ */
+export async function loadPageData(queryClient: QueryClient, path: string) {
+  await Promise.all([
+    queryClient.prefetchQuery(queries.site()),
+    queryClient.prefetchQuery(queries.photos()),
+    ...prefetchPageQueries(queryClient, path),
+  ])
 }
 
 /**

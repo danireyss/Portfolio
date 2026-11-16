@@ -33,12 +33,23 @@ export function setContentVersion(version: string | undefined) {
   contentVersion = version
 }
 
+/** Empty in the browser, where /api is on the same site; the server renderer sets it. */
+let apiOrigin = ''
+
+/**
+ * Sends requests to the API at `origin` (e.g. http://localhost:3000). For the server renderer,
+ * which has no page for `/api` to be relative to.
+ */
+export function setApiOrigin(origin: string) {
+  apiOrigin = origin
+}
+
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const isRead = (init?.method ?? 'GET') === 'GET'
   const url =
     contentVersion && isRead
-      ? `/api${path}${path.includes('?') ? '&' : '?'}v=${encodeURIComponent(contentVersion)}`
-      : `/api${path}`
+      ? `${apiOrigin}/api${path}${path.includes('?') ? '&' : '?'}v=${encodeURIComponent(contentVersion)}`
+      : `${apiOrigin}/api${path}`
   const response = await fetch(url, {
     ...init,
     headers: { Accept: 'application/json', ...init?.headers },
