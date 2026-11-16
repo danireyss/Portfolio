@@ -88,12 +88,13 @@ DISTRIBUTION_ID ?= $(shell aws cloudformation describe-stacks --stack-name Portf
 # The live site reads its content from the media bucket (content/), which admin edits.
 # content-push uploads the repo's content/ over it: the first time, or to replace admin's edits
 # with git's. content-pull copies the live content into content/ (mirroring deletions) so it
-# can be committed.
+# can be committed. content-push then clears CloudFront's cache, rendered pages included, as an
+# admin save does.
 content-push:
 	@test -n "$(MEDIA_BUCKET)" || (echo "No media bucket found; deploy PortfolioStack first" && exit 1)
 	aws s3 sync content s3://$(MEDIA_BUCKET)/content --exclude ".DS_Store"
 	date +%s | aws s3 cp - s3://$(MEDIA_BUCKET)/content/version
-	aws cloudfront create-invalidation --distribution-id $(DISTRIBUTION_ID) --paths '/api/*' > /dev/null
+	aws cloudfront create-invalidation --distribution-id $(DISTRIBUTION_ID) --paths '/*' > /dev/null
 
 content-pull:
 	@test -n "$(MEDIA_BUCKET)" || (echo "No media bucket found; deploy PortfolioStack first" && exit 1)
